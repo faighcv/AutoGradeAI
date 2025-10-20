@@ -1,0 +1,16 @@
+
+fastapi
+
+uvicorn[standard]
+python-jose[cryptography]
+
+passlib[bcrypt]
+
+sqlalchemy>=2.0
+
+pydantic>=2
+
+scikit-learn
+
+sentence-transformers
+

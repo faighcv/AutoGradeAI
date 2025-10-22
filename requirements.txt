@@ -8,9 +8,12 @@ passlib[bcrypt]
 
 sqlalchemy>=2.0
 
+psycopg[binary]
+
 pydantic>=2
 
 scikit-learn
 
 sentence-transformers
 
+python-dotenv

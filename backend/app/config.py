@@ -2,6 +2,11 @@ from pydantic import BaseModel
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from pathlib import Path
+
+# Always load .env from the repo root, no matter where uvicorn is run from
+ROOT_ENV = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=ROOT_ENV, override=True)
 
 # Load .env at project root; harmless if file is missing
 load_dotenv()

@@ -1,22 +1,40 @@
+// frontend/src/App.jsx
 import React, { useState } from 'react'
 import axios from 'axios'
 
-const API = 'http://localhost:8000'
+const API = 'http://127.0.0.1:8000'
 
 function Auth({ onToken }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('STUDENT')
+  const [busy, setBusy] = useState(false)
 
   const register = async () => {
-    await axios.post(`${API}/auth/register`, { email, password, role })
-    alert('Registered! Now login.')
+    setBusy(true)
+    try {
+      await axios.post(`${API}/auth/register`, { email, password, role })
+      alert('Registered! Now login.')
+    } catch (err) {
+      console.error(err)
+      alert('Register failed: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const login = async () => {
-    const { data } = await axios.post(`${API}/auth/login`, { email, password, role })
-    localStorage.setItem('token', data.access_token)
-    onToken(data.access_token)
+    setBusy(true)
+    try {
+      const { data } = await axios.post(`${API}/auth/login`, { email, password, role })
+      localStorage.setItem('token', data.access_token)
+      onToken(data.access_token)
+    } catch (err) {
+      console.error(err)
+      alert('Login failed: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -35,8 +53,8 @@ function Auth({ onToken }) {
         </select>
       </div>
       <div style={{marginTop:8}}>
-        <button onClick={register}>Register</button>
-        <button onClick={login} style={{marginLeft:8}}>Login</button>
+        <button onClick={register} disabled={busy}>Register</button>
+        <button onClick={login} style={{marginLeft:8}} disabled={busy}>Login</button>
       </div>
     </div>
   )
@@ -52,6 +70,7 @@ function Professor() {
     { idx: 1, prompt: '', max_points: 10, answer_key: { text: '', keywords: [] } }
   ])
   const [flags, setFlags] = useState([])
+  const [solutionPdf, setSolutionPdf] = useState(null)
 
   const createExam = async () => {
     const { data } = await axios.post(`${API}/prof/exams`, { title, due_at: dueAt }, auth)
@@ -63,6 +82,17 @@ function Professor() {
     const payload = questions.map(q => ({...q, max_points: Number(q.max_points)}))
     await axios.post(`${API}/prof/exams/${examId}/questions`, payload, auth)
     alert('Questions added')
+  }
+
+  const uploadSolution = async () => {
+    if (!solutionPdf) return alert('Choose a PDF first')
+    const form = new FormData()
+    form.append('file', solutionPdf)
+    await axios.post(`${API}/prof/exams/${examId}/solution_pdf`, form, {
+      ...auth,
+      headers: { ...auth.headers, 'Content-Type': 'multipart/form-data' }
+    })
+    alert('Solution PDF processed: answer keys created/updated')
   }
 
   const loadFlags = async () => {
@@ -85,7 +115,11 @@ function Professor() {
 
       {examId && (
         <>
-          <h4 style={{marginTop:12}}>Questions for Exam {examId}</h4>
+          <h4 style={{marginTop:12}}>Solution PDF for Exam {examId}</h4>
+          <input type="file" accept="application/pdf" onChange={e=>setSolutionPdf(e.target.files?.[0] || null)} />
+          <button onClick={uploadSolution} style={{marginLeft:8}}>Upload Solution PDF</button>
+
+          <h4 style={{marginTop:12}}>Questions (manual add / edit optional)</h4>
           {questions.map((q, i)=>(
             <div key={i} style={{marginBottom:8}}>
               <input style={{width:40}} type="number" value={q.idx} onChange={e=>setQuestions(prev=>prev.map((x,j)=> j===i? {...x, idx:Number(e.target.value)}:x))}/>
@@ -117,7 +151,7 @@ function Student() {
   const auth = { headers: { Authorization: `Bearer ${token}` } }
   const [exams, setExams] = useState([])
   const [examId, setExamId] = useState('')
-  const [answers, setAnswers] = useState([])
+  const [pdf, setPdf] = useState(null)
   const [grade, setGrade] = useState(null)
 
   const loadOpen = async () => {
@@ -125,13 +159,14 @@ function Student() {
     setExams(data)
   }
 
-  const selectExam = (id) => {
-    setExamId(id)
-    setAnswers([{question_id: 0, text: ''}])
-  }
-
-  const submit = async () => {
-    const { data } = await axios.post(`${API}/student/exams/${examId}/submit`, { answers }, auth)
+  const submitPdf = async () => {
+    if (!pdf) return alert('Choose a PDF first')
+    const form = new FormData()
+    form.append('file', pdf)
+    const { data } = await axios.post(`${API}/student/exams/${examId}/submit_pdf`, form, {
+      ...auth,
+      headers: { ...auth.headers, 'Content-Type': 'multipart/form-data' }
+    })
     setGrade(data)
   }
 
@@ -143,21 +178,16 @@ function Student() {
         {exams.map(e=>(
           <li key={e.id}>
             {e.title} — due {new Date(e.due_at).toISOString()}
-            <button onClick={()=>selectExam(e.id)} style={{marginLeft:8}}>Choose</button>
+            <button onClick={()=>setExamId(e.id)} style={{marginLeft:8}}>Choose</button>
           </li>
         ))}
       </ul>
+
       {examId && (
         <>
-          <h4>Answers for exam {examId}</h4>
-          {answers.map((a, i)=>(
-            <div key={i} style={{marginBottom:8}}>
-              <input style={{width:120}} type="number" placeholder="question_id" value={a.question_id} onChange={e=>setAnswers(prev=>prev.map((x,j)=> j===i? {...x, question_id:Number(e.target.value)}:x))}/>
-              <input style={{marginLeft:8, width:600}} placeholder="your answer text" value={a.text} onChange={e=>setAnswers(prev=>prev.map((x,j)=> j===i? {...x, text:e.target.value}:x))}/>
-            </div>
-          ))}
-          <button onClick={()=>setAnswers(prev=>[...prev, {question_id: 0, text:''}])}>Add Answer Row</button>
-          <button onClick={submit} style={{marginLeft:8}}>Submit</button>
+          <h4>Submit PDF for exam {examId}</h4>
+          <input type="file" accept="application/pdf" onChange={e=>setPdf(e.target.files?.[0] || null)} />
+          <button onClick={submitPdf} style={{marginLeft:8}}>Upload & Grade</button>
           {grade && (
             <pre style={{background:'#f7f7f7', padding:12, marginTop:12}}>{JSON.stringify(grade, null, 2)}</pre>
           )}
@@ -166,6 +196,7 @@ function Student() {
     </div>
   )
 }
+
 
 export default function App(){
   const [token, setToken] = useState(localStorage.getItem('token') || null)

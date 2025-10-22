@@ -7,6 +7,10 @@ from ..deps import get_db, get_current_user
 from ..services.grading import score_answer
 from ..services.similarity import flag_pairs
 from ..config import settings
+from fastapi import UploadFile, File
+from pathlib import Path
+from ..utils.pdf import extract_pdf_text
+from ..services.parser import split_answers_by_question
 
 auth_scheme = HTTPBearer()
 router = APIRouter()
@@ -78,3 +82,65 @@ def submit(exam_id: int, payload: schemas.SubmissionCreate, creds: HTTPAuthoriza
         db.commit()
 
     return {"submission_id": sub.id, "grade_total": grade.total, "breakdown": grade.breakdown}
+
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@router.post("/exams/{exam_id}/submit_pdf")
+def submit_pdf(
+    exam_id: int,
+    file: UploadFile = File(...),
+    creds: HTTPAuthorizationCredentials = Depends(auth_scheme),
+    db: Session = Depends(get_db)
+):
+    student_id = require_student(creds)
+    exam = db.query(models.Exam).get(exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="exam not found")
+
+    # save file
+    dest = UPLOAD_DIR / f"exam_{exam_id}_student_{student_id}.pdf"
+    with dest.open("wb") as f:
+        f.write(file.file.read())
+
+    # extract & split
+    text = extract_pdf_text(str(dest))
+    ans_map = split_answers_by_question(text)   # {idx: text}
+
+    # create submission
+    sub = models.Submission(exam_id=exam_id, student_id=student_id, status="PENDING")
+    db.add(sub); db.commit(); db.refresh(sub)
+
+    # map to qids
+    qlist = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
+    by_idx = {q.idx: q for q in qlist}
+    ans_objs = []
+    for idx, atext in ans_map.items():
+        if idx in by_idx:
+            ans_objs.append(models.Answer(submission_id=sub.id, question_id=by_idx[idx].id, text=atext))
+    if ans_objs:
+        db.add_all(ans_objs); db.commit()
+
+    # grade now (reuse your scoring)
+    total = 0.0
+    breakdown = {}
+    for a in ans_objs:
+        q = by_idx[[k for k, v in by_idx.items() if v.id == a.question_id][0]]
+        result = score_answer(a.text, q.answer_key, q.max_points)
+        total += result["points"]
+        breakdown[str(q.id)] = result
+
+    grade = models.Grade(submission_id=sub.id, total=round(total, 2), breakdown=breakdown)
+    sub.status = "GRADED"
+    db.add(grade); db.commit(); db.refresh(grade)
+
+    # record SubmissionDoc
+    doc = models.SubmissionDoc(submission_id=sub.id, file_path=str(dest), extracted_text=text)
+    db.add(doc); db.commit()
+
+    return {
+        "submission_id": sub.id,
+        "grade_total": grade.total,
+        "breakdown": grade.breakdown,
+        "answers_saved": len(ans_objs)
+    }

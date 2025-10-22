@@ -60,3 +60,17 @@ class SimilarityFlag(Base):
     sem: Mapped[float] = mapped_column(Float)
     jacc: Mapped[float] = mapped_column(Float)
     reason: Mapped[str] = mapped_column(Text)
+
+class SolutionDoc(Base):
+    __tablename__ = "solution_docs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    exam_id: Mapped[int] = mapped_column(ForeignKey("exams.id"), unique=True, index=True)
+    file_path: Mapped[str] = mapped_column(String(512))
+    extracted_text: Mapped[str] = mapped_column(Text)
+
+class SubmissionDoc(Base):
+    __tablename__ = "submission_docs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    submission_id: Mapped[int] = mapped_column(ForeignKey("submissions.id"), unique=True, index=True)
+    file_path: Mapped[str] = mapped_column(String(512))
+    extracted_text: Mapped[str] = mapped_column(Text)

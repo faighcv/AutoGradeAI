@@ -8,7 +8,7 @@ from .routers import professor as professor_router
 from .routers import student as student_router
 from .routers import grading as grading_router
 
-app = FastAPI(title="AutoGradeAI (Supabase-ready)")
+app = FastAPI(title="AutoGradeAI (Cookie Sessions)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,7 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create tables (MVP). For production, use Alembic migrations.
 Base.metadata.create_all(bind=engine)
 
 @app.get("/")

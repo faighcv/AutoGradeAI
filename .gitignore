@@ -207,3 +207,10 @@ marimo/_lsp/
 __marimo__/
 
 .env
+
+# App uploads (student/prof PDFs etc.)
+uploads/
+
+# Frontend dependencies
+frontend/node_modules/
+

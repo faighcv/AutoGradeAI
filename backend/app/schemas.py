@@ -7,15 +7,11 @@ class UserCreate(BaseModel):
     password: str
     role: str  # PROF or STUDENT
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
 class QuestionCreate(BaseModel):
     idx: int
     prompt: str
     max_points: float
-    answer_key: Dict[str, Any]  # {"text": "...", "keywords":[...]}
+    answer_key: Dict[str, Any]
 
 class ExamCreate(BaseModel):
     title: str

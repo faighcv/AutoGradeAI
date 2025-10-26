@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import uuid
+
 from .. import schemas, models
 from ..auth.hashing import hash_password, verify_password
-from ..auth.jwt import create_access_token
 from ..deps import get_db
+from ..config import settings
 
 router = APIRouter()
 
@@ -17,10 +20,28 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(u); db.commit(); db.refresh(u)
     return {"id": u.id, "email": u.email, "role": u.role}
 
-@router.post("/login", response_model=schemas.Token)
-def login(creds: schemas.UserCreate, db: Session = Depends(get_db)):
+@router.post("/login")
+def login(creds: schemas.UserCreate, response: Response, db: Session = Depends(get_db)):
     u = db.query(models.User).filter(models.User.email == creds.email).first()
     if not u or not verify_password(creds.password, u.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    token = create_access_token(sub=str(u.id), role=u.role)
-    return {"access_token": token}
+
+    sid = uuid.uuid4().hex
+    expires = datetime.utcnow() + timedelta(hours=settings.SESSION_EXPIRE_HOURS)
+    db.add(models.Session(id=sid, user_id=u.id, expires_at=expires)); db.commit()
+
+    response.set_cookie(
+        key="ag_session",
+        value=sid,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # set True when serving over HTTPS
+        max_age=settings.SESSION_EXPIRE_HOURS * 3600,
+        path="/",
+    )
+    return {"id": u.id, "email": u.email, "role": u.role}
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("ag_session", path="/")
+    return {"ok": True}

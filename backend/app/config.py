@@ -10,20 +10,14 @@ load_dotenv(dotenv_path=ROOT_ENV, override=True)
 load_dotenv()
 
 class Settings(BaseModel):
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me")  # kept for future use
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # unused now
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./autograde.db")
     EMBEDDINGS_MODEL: str = os.getenv("EMBEDDINGS_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     SIM_THRESH_SEM: float = float(os.getenv("SIM_THRESH_SEM", "0.90"))
     SIM_THRESH_JACC: float = float(os.getenv("SIM_THRESH_JACC", "0.80"))
-
     SESSION_EXPIRE_HOURS: int = int(os.getenv("SESSION_EXPIRE_HOURS", "12"))
-
-    # ✅ NEW: OpenAI configuration
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 settings = Settings()
 ACCESS_TOKEN_EXPIRE = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

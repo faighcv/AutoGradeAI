@@ -4,6 +4,8 @@ from datetime import datetime
 from .database import SessionLocal
 from .models import Session as DBSession, User
 
+COOKIE_NAME = "ag_session"
+
 def get_db():
     db = SessionLocal()
     try:
@@ -12,7 +14,7 @@ def get_db():
         db.close()
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    sid = request.cookies.get("ag_session")
+    sid = request.cookies.get(COOKIE_NAME)
     if not sid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     s = db.query(DBSession).filter(DBSession.id == sid).first()

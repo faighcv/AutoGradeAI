@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import schemas, models
@@ -10,42 +10,72 @@ from ..services.parser import split_answers_by_question
 
 router = APIRouter()
 
+# ----------------------------- Helpers -----------------------------
 def require_prof(user=Depends(get_current_user)) -> int:
+    """Ensure only professors can access these endpoints."""
     if user.role != "PROF":
         raise HTTPException(status_code=403, detail="Professor role required")
     return user.id
 
+# ----------------------------- Create Exam -----------------------------
 @router.post("/exams", response_model=schemas.ExamOut)
 def create_exam(payload: schemas.ExamCreate, user=Depends(require_prof), db: Session = Depends(get_db)):
-    if payload.due_at <= datetime.utcnow():
+    """
+    Professor creates a new exam.
+    """
+    # ✅ FIXED: use timezone-aware UTC datetime for comparison
+    if payload.due_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="due_at must be in the future (UTC)")
+    
     exam = models.Exam(title=payload.title, due_at=payload.due_at, created_by=user)
-    db.add(exam); db.commit(); db.refresh(exam)
+    db.add(exam)
+    db.commit()
+    db.refresh(exam)
     return exam
 
+# ----------------------------- Add Questions -----------------------------
 @router.post("/exams/{exam_id}/questions")
 def add_questions(exam_id: int, items: list[schemas.QuestionCreate], user=Depends(require_prof), db: Session = Depends(get_db)):
     exam = db.query(models.Exam).get(exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="exam not found")
 
-    # If author provides explicit points, we keep them; otherwise equalize later.
-    qobjs = [models.Question(exam_id=exam_id, idx=q.idx, prompt=q.prompt, max_points=q.max_points, answer_key=q.answer_key) for q in items]
-    db.add_all(qobjs); db.commit()
+    qobjs = [
+        models.Question(
+            exam_id=exam_id,
+            idx=q.idx,
+            prompt=q.prompt,
+            max_points=q.max_points,
+            answer_key=q.answer_key
+        ) for q in items
+    ]
+    db.add_all(qobjs)
+    db.commit()
     return {"count": len(qobjs)}
 
+# ----------------------------- View Similarity Flags -----------------------------
 @router.get("/exams/{exam_id}/flags")
 def get_flags(exam_id: int, user=Depends(require_prof), db: Session = Depends(get_db)):
-    flags = (db.query(models.SimilarityFlag)
-               .filter(models.SimilarityFlag.exam_id == exam_id)
-               .order_by(models.SimilarityFlag.sem.desc())
-               .all())
+    flags = (
+        db.query(models.SimilarityFlag)
+        .filter(models.SimilarityFlag.exam_id == exam_id)
+        .order_by(models.SimilarityFlag.sem.desc())
+        .all()
+    )
     return [
-        {"id": f.id, "submission_a": f.submission_a, "submission_b": f.submission_b,
-         "question_id": f.question_id, "sem": round(f.sem,3), "jacc": round(f.jacc,3), "reason": f.reason}
+        {
+            "id": f.id,
+            "submission_a": f.submission_a,
+            "submission_b": f.submission_b,
+            "question_id": f.question_id,
+            "sem": round(f.sem, 3),
+            "jacc": round(f.jacc, 3),
+            "reason": f.reason,
+        }
         for f in flags
     ]
 
+# ----------------------------- Upload Professor Solution PDF -----------------------------
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -56,6 +86,10 @@ def upload_solution_pdf(
     user=Depends(require_prof),
     db: Session = Depends(get_db)
 ):
+    """
+    Upload and parse the professor's official solution PDF.
+    Extracts answers and auto-generates question list if not already present.
+    """
     exam = db.query(models.Exam).get(exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="exam not found")
@@ -69,7 +103,6 @@ def upload_solution_pdf(
     if not qanswers:
         raise HTTPException(status_code=400, detail="No questions detected in solution PDF")
 
-    # Equal weights that sum to 100 (unless you later edit points manually)
     n = max(1, len(qanswers))
     per = round(100.0 / n, 2)
 
@@ -84,22 +117,32 @@ def upload_solution_pdf(
             q = models.Question(
                 exam_id=exam_id,
                 idx=idx,
-                prompt=f"Q{idx}",            # you can later PATCH real prompts if desired
+                prompt=f"Q{idx}",
                 max_points=per,
-                answer_key={"text": ans_text, "keywords": []}
+                answer_key={"text": ans_text, "keywords": []},
             )
-            db.add(q); count_new += 1
+            db.add(q)
+            count_new += 1
         else:
-            q.answer_key = {"text": ans_text, "keywords": (q.answer_key or {}).get("keywords", [])}
+            q.answer_key = {
+                "text": ans_text,
+                "keywords": (q.answer_key or {}).get("keywords", []),
+            }
             q.max_points = per
     db.commit()
 
-    # Record solution doc
-    doc = (db.query(models.SolutionDoc).filter(models.SolutionDoc.exam_id == exam_id).first())
+    # Record solution document metadata
+    doc = db.query(models.SolutionDoc).filter(models.SolutionDoc.exam_id == exam_id).first()
     if not doc:
         db.add(models.SolutionDoc(exam_id=exam_id, file_path=str(dest), extracted_text=text))
     else:
-        doc.file_path = str(dest); doc.extracted_text = text
+        doc.file_path = str(dest)
+        doc.extracted_text = text
     db.commit()
 
-    return {"exam_id": exam_id, "questions_detected": n, "points_per_question": per, "total_points": round(per*n, 2)}
+    return {
+        "exam_id": exam_id,
+        "questions_detected": n,
+        "points_per_question": per,
+        "total_points": round(per * n, 2),
+    }

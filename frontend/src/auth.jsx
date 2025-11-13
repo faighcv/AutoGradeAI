@@ -15,9 +15,9 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const login = async (email, password) => {
-    const u = await api.login(email, password); // cookie set by server
-    setUser(u);
-  };
+  const u = await api.login(email, password); // backend sets cookie
+  setUser(u);
+};
 
   const logout = async () => {
     await api.logout();

@@ -5,7 +5,6 @@ import Dashboard from "./pages/Dashboard";
 import { AuthProvider, useAuth } from "./auth";
 import NavBar from "./components/NavBar";
 
-
 function PrivateOutlet() {
   const { user } = useAuth();
   return user ? <Dashboard /> : <Navigate to="/login" replace />;

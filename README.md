@@ -46,7 +46,6 @@
 
 # 🖼️ Screenshots
 
-> After pushing to GitHub, drag and drop your screenshots here to replace the placeholders.
 
 ### 🔐 Login Page  
 ![Login](UPLOAD_LOGIN_IMAGE)

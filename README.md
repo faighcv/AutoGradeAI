@@ -75,3 +75,19 @@
 
 # 🧩 System Architecture
 
+flowchart LR
+    A[Student UI] -->|Upload PDF| B[Backend API]
+    B -->|Vision Extraction & Grading| C[OpenAI GPT-4o]
+    B -->|Store Results| D[(PostgreSQL)]
+    A2[Professor UI] -->|View Grades & Submissions| B
+
+
+### 🧠 Flow Summary
+1. **Student uploads a PDF**
+2. **Backend extracts images → GPT-4o reads & grades answers**
+3. **Scores stored in PostgreSQL**
+4. **Professor sees:**
+   - All student submissions
+   - Grades with breakdown
+   - Solution sync
+

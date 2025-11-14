@@ -48,25 +48,25 @@
 
 
 ### 🔐 Login Page  
-![Login](UPLOAD_LOGIN_IMAGE)
+![Login](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.42.22.png?raw=true)
 
 ### 🧑‍🏫 Professor Dashboard  
-![Professor Dashboard](UPLOAD_PROFESSOR_DASHBOARD_IMAGE)
+![Professor Dashboard](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.54.36.png?raw=true)
 
 ### ➕ Create Exam  
-![Create Exam](UPLOAD_CREATE_EXAM_IMAGE)
+![Create Exam](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.46.20.png?raw=true)
 
 ### 📤 Upload Solution PDF  
-![Upload Solution](UPLOAD_SOLUTION_IMAGE)
+![Upload Solution](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.48.38.png?raw=true)
 
 ### 🎓 Student Exam List  
-![Student List](UPLOAD_STUDENT_LIST_IMAGE)
+![Student List](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.49.23.png?raw=true)
 
 ### 📥 Student Submission  
-![Student Submission](UPLOAD_STUDENT_SUBMISSION_IMAGE)
+![Student Submission](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.49.59.png?raw=true)
 
 ### 📝 AI Grading Breakdown  
-![Grading Result](UPLOAD_GRADING_RESULT_IMAGE)
+![Grading Result](https://github.com/faighcv/AutoGradeAI/blob/main/images/Screenshot%202025-11-13%20at%2023.52.37.png?raw=true)
 
 ---
 

@@ -67,3 +67,15 @@ export async function getGrade(submissionId) {
   const { data } = await http.get(`/grade/submissions/${submissionId}`);
   return data;
 }
+
+// NEW: Fetch exams created by professor
+export async function getMyExams() {
+  const { data } = await http.get("/prof/exams");
+  return data;
+}
+
+// NEW: Fetch student submissions for a given exam
+export async function getExamSubmissions(examId) {
+  const { data } = await http.get(`/prof/exams/${examId}/submissions`);
+  return data;
+}

@@ -3,81 +3,34 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime
 from pathlib import Path
+import json
 
 from .. import schemas, models
 from ..deps import get_db, get_current_user
-from ..services.grading import score_answer
-from ..services.similarity import flag_pairs
 from ..config import settings
-from ..utils.pdf import extract_pdf_text
-from ..services.parser import split_answers_by_question
+from ..utils.images import pdf_to_pngs
+from ..services.grading_vision import grade_question_images, detect_question_spans
 
 router = APIRouter()
 
+# ----------------------------- Helpers -----------------------------
 def require_student(user=Depends(get_current_user)):
+    """Ensure only students can access these endpoints."""
     if user.role != "STUDENT":
         raise HTTPException(status_code=403, detail="Student role required")
     return user
 
+
+# ----------------------------- View Open Exams -----------------------------
 @router.get("/exams/open")
 def list_open_exams(user=Depends(require_student), db: Session = Depends(get_db)):
+    """List exams that are still open for submission."""
     now = datetime.utcnow()
     exams = db.query(models.Exam).filter(models.Exam.due_at > now).all()
     return [{"id": e.id, "title": e.title, "due_at": e.due_at} for e in exams]
 
-@router.post("/exams/{exam_id}/submit")
-def submit(exam_id: int, payload: schemas.SubmissionCreate, user=Depends(require_student), db: Session = Depends(get_db)):
-    exam = db.query(models.Exam).get(exam_id)
-    if not exam:
-        raise HTTPException(status_code=404, detail="exam not found")
-    if datetime.utcnow() > exam.due_at:
-        raise HTTPException(status_code=403, detail="deadline passed")
 
-    sub = models.Submission(exam_id=exam_id, student_id=user.id, status="PENDING")
-    db.add(sub); db.commit(); db.refresh(sub)
-
-    qids = {q.id: q for q in db.query(models.Question).filter(models.Question.exam_id == exam_id).all()}
-    ans_objs = []
-    for a in payload.answers:
-        if a.question_id not in qids:
-            raise HTTPException(status_code=400, detail=f"invalid question_id {a.question_id}")
-        ans_objs.append(models.Answer(submission_id=sub.id, question_id=a.question_id, text=a.text))
-    db.add_all(ans_objs); db.commit()
-
-    total = 0.0
-    breakdown = {}
-    for a in ans_objs:
-        q = qids[a.question_id]
-        result = score_answer(a.text, q.answer_key, q.max_points)
-        total += result["points"]
-        breakdown[str(a.question_id)] = result
-
-    grade = models.Grade(submission_id=sub.id, total=round(total, 2), breakdown=breakdown)
-    sub.status = "GRADED"
-    db.add(grade); db.commit(); db.refresh(grade)
-
-    for qid in qids:
-        all_answers = (db.query(models.Answer)
-                         .join(models.Submission, models.Submission.id == models.Answer.submission_id)
-                         .filter(models.Submission.exam_id == exam_id, models.Answer.question_id == qid)
-                         .all())
-        payloads = [{"submission_id": x.submission_id, "text": x.text} for x in all_answers]
-        for p in flag_pairs(payloads, settings.SIM_THRESH_SEM, settings.SIM_THRESH_JACC):
-            exists = (db.query(models.SimilarityFlag)
-                        .filter(models.SimilarityFlag.exam_id == exam_id,
-                                models.SimilarityFlag.submission_a == p["submission_a"],
-                                models.SimilarityFlag.submission_b == p["submission_b"],
-                                models.SimilarityFlag.question_id == qid).first())
-            if not exists and p["submission_a"] != p["submission_b"]:
-                db.add(models.SimilarityFlag(
-                    exam_id=exam_id, submission_a=p["submission_a"], submission_b=p["submission_b"],
-                    question_id=qid, sem=p["sem"], jacc=p["jacc"],
-                    reason=f"Q{qid}: cosine {p['sem']:.2f}, jacc {p['jacc']:.2f}"
-                ))
-        db.commit()
-
-    return {"submission_id": sub.id, "grade_total": grade.total, "breakdown": grade.breakdown}
-
+# ----------------------------- Submit Exam as PDF (Vision-based) -----------------------------
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -88,47 +41,100 @@ def submit_pdf(
     user=Depends(require_student),
     db: Session = Depends(get_db)
 ):
+    """
+    Student uploads their solved exam PDF.
+    Converts it to images, uses solution metadata to grade visually.
+    """
     exam = db.query(models.Exam).get(exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="exam not found")
+    if datetime.utcnow() > exam.due_at:
+        raise HTTPException(status_code=403, detail="deadline passed")
 
+    # 1️⃣ Save the PDF
     dest = UPLOAD_DIR / f"exam_{exam_id}_student_{user.id}.pdf"
     with dest.open("wb") as f:
         f.write(file.file.read())
 
-    text = extract_pdf_text(str(dest))
-    ans_map = split_answers_by_question(text)
+    # 2️⃣ Convert PDF → PNGs
+    img_dir = UPLOAD_DIR / f"exam_{exam_id}_student_{user.id}_imgs"
+    student_imgs = pdf_to_pngs(str(dest), str(img_dir))
 
+    # 3️⃣ Create Submission entry
     sub = models.Submission(exam_id=exam_id, student_id=user.id, status="PENDING")
-    db.add(sub); db.commit(); db.refresh(sub)
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
 
-    qlist = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
-    by_idx = {q.idx: q for q in qlist}
-    ans_objs = []
-    for idx, atext in ans_map.items():
-        if idx in by_idx:
-            ans_objs.append(models.Answer(submission_id=sub.id, question_id=by_idx[idx].id, text=atext))
-    if ans_objs:
-        db.add_all(ans_objs); db.commit()
+    # 4️⃣ Load professor's solution metadata
+    sdoc = db.query(models.SolutionDoc).filter(models.SolutionDoc.exam_id == exam_id).first()
+    if not sdoc:
+        raise HTTPException(status_code=400, detail="Professor has not uploaded a solution PDF yet")
 
+    try:
+        sol_meta = json.loads(sdoc.extracted_text or "{}")
+    except Exception:
+        sol_meta = {}
+
+    solution_imgs = sol_meta.get("images", [])
+    spans = sol_meta.get("spans", [])
+
+    # 5️⃣ Get questions from DB
+    questions = db.query(models.Question).filter(models.Question.exam_id == exam_id).all()
+    by_idx = {q.idx: q for q in questions}
+
+    # 6️⃣ If professor spans missing, detect locally (fallback)
+    if not spans:
+        spans = detect_question_spans(student_imgs)
+
+    # 7️⃣ Associate student images per question
+    # (Naive version: all pages → each question. You can refine by spans later.)
+    per_question_imgs = {qidx: student_imgs for qidx in by_idx.keys()}
+
+    # 8️⃣ Grade each question visually
     total = 0.0
     breakdown = {}
-    for a in ans_objs:
-        q = by_idx[[k for k, v in by_idx.items() if v.id == a.question_id][0]]
-        result = score_answer(a.text, q.answer_key, q.max_points)
+
+    for qidx, q in sorted(by_idx.items()):
+        stu_imgs = per_question_imgs.get(qidx, [])
+        if not stu_imgs:
+            breakdown[str(q.id)] = {
+                "points": 0.0,
+                "feedback": {
+                    "rationale": "No images found for this question",
+                    "strengths": [],
+                    "missing": ["Provide answer"],
+                },
+            }
+            continue
+
+        result = grade_question_images(qidx, stu_imgs, solution_imgs, q.max_points)
         total += result["points"]
         breakdown[str(q.id)] = result
 
+        # Store minimal answer text ref for traceability
+        db.add(models.Answer(submission_id=sub.id, question_id=q.id, text=f"[Q{qidx}: image-based answer]"))
+
+    db.commit()
+
+    # 9️⃣ Store grade
     grade = models.Grade(submission_id=sub.id, total=round(total, 2), breakdown=breakdown)
     sub.status = "GRADED"
-    db.add(grade); db.commit(); db.refresh(grade)
+    db.add(grade)
+    db.commit()
+    db.refresh(grade)
 
-    doc = models.SubmissionDoc(submission_id=sub.id, file_path=str(dest), extracted_text=text)
-    db.add(doc); db.commit()
+    # 🔟 Save student image metadata
+    payload = {"images": student_imgs}
+    doc = models.SubmissionDoc(submission_id=sub.id, file_path=str(dest), extracted_text=json.dumps(payload))
+    db.add(doc)
+    db.commit()
 
     return {
         "submission_id": sub.id,
         "grade_total": grade.total,
         "breakdown": breakdown,
-        "answers_saved": len(ans_objs)
+        "answers_saved": len(questions)
     }
+
+

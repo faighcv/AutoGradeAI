@@ -18,6 +18,10 @@ class Settings(BaseModel):
     SIM_THRESH_SEM: float = float(os.getenv("SIM_THRESH_SEM", "0.90"))
     SIM_THRESH_JACC: float = float(os.getenv("SIM_THRESH_JACC", "0.80"))
     SESSION_EXPIRE_HOURS: int = int(os.getenv("SESSION_EXPIRE_HOURS", "12"))
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")  # vision-capable
+    MAX_IMAGES_PER_CALL: int = int(os.getenv("MAX_IMAGES_PER_CALL", "10"))
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 settings = Settings()
 ACCESS_TOKEN_EXPIRE = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

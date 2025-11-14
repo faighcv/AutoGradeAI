@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as api from "../api";
 import { useAuth } from "../auth.jsx";
 
 export default function Professor() {
   const { user } = useAuth();
+
+  // ------------------- Existing States -------------------
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [exam, setExam] = useState(null);
@@ -12,6 +14,11 @@ export default function Professor() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
+  // ------------------- NEW States (Exams & Submissions) -------------------
+  const [myExams, setMyExams] = useState([]);
+  const [selectedExamId, setSelectedExamId] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+
   // Convert datetime-local input → ISO string (UTC)
   const toIsoUtc = (s) => {
     if (!s) return null;
@@ -19,6 +26,32 @@ export default function Professor() {
     const local = new Date(normalized);
     if (Number.isNaN(local.getTime())) return null;
     return new Date(local.getTime() - local.getTimezoneOffset() * 60000).toISOString();
+  };
+
+  // ------------------ Load All Exams Created by Professor ------------------
+  useEffect(() => {
+    loadMyExams();
+  }, []);
+
+  const loadMyExams = async () => {
+    try {
+      const list = await api.getMyExams();
+      setMyExams(list);
+    } catch (e) {
+      console.error("Failed to load exams:", e);
+    }
+  };
+
+  // ------------------ Load Submissions for a Selected Exam ------------------
+  const openExamSubmissions = async (examId) => {
+    setSelectedExamId(examId);
+
+    try {
+      const list = await api.getExamSubmissions(examId);
+      setSubmissions(list);
+    } catch (e) {
+      console.error("Failed to load submissions:", e);
+    }
   };
 
   // ------------------ Create Exam ------------------
@@ -34,6 +67,10 @@ export default function Professor() {
       const e = await api.createExam({ title, due_at: iso });
       setExam(e);
       setMsg("✅ Exam created successfully. You can now upload the solution PDF below.");
+
+      // refresh exam list
+      loadMyExams();
+
     } catch (e) {
       const message =
         e?.response?.data?.detail ||
@@ -67,8 +104,10 @@ export default function Professor() {
     }
   };
 
+  // ------------------ UI Rendering ------------------
   return (
     <div className="grid2">
+
       {/* ------------------ Create Exam ------------------ */}
       <div className="card">
         <h2>Create exam</h2>
@@ -101,7 +140,7 @@ export default function Professor() {
         </div>
       )}
 
-      {/* ------------------ Error Message (only if error exists) ------------------ */}
+      {/* ------------------ Error Message ------------------ */}
       {err && (
         <div className="card">
           <h2>Error</h2>
@@ -157,6 +196,59 @@ export default function Professor() {
           </table>
         </div>
       )}
+
+      {/* ------------------ NEW: My Exams ------------------ */}
+      <div className="card full">
+        <h2>Your Exams</h2>
+
+        {!myExams.length && <p className="muted">You haven't created any exams yet.</p>}
+
+        <ul className="list">
+          {myExams.map(ex => (
+            <li key={ex.id} onClick={() => openExamSubmissions(ex.id)}>
+              <div className="title">{ex.title}</div>
+              <div className="muted">
+                Exam ID {ex.id} · Due {new Date(ex.due_at).toLocaleString()}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* ------------------ NEW: Submissions for Selected Exam ------------------ */}
+      {selectedExamId && (
+        <div className="card full">
+          <h2>Submissions for Exam #{selectedExamId}</h2>
+
+          {!submissions.length && <p className="muted">No submissions yet.</p>}
+
+          {submissions.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Submission ID</th>
+                  <th>Student ID</th>
+                  <th>Submitted At</th>
+                  <th>Status</th>
+                  <th>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map(s => (
+                  <tr key={s.submission_id}>
+                    <td>{s.submission_id}</td>
+                    <td>{s.student_id}</td>
+                    <td>{new Date(s.submitted_at).toLocaleString()}</td>
+                    <td>{s.status}</td>
+                    <td>{s.grade_total ?? "Not graded"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }

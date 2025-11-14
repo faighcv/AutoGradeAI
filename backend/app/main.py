@@ -6,7 +6,6 @@ from .models import Base
 from .routers import auth as auth_router
 from .routers import professor as professor_router
 from .routers import student as student_router
-from .routers import grading as grading_router
 
 app = FastAPI(title="AutoGradeAI (Cookie Sessions)")
 
@@ -37,4 +36,3 @@ def debug_cookies(request: Request):
 app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
 app.include_router(professor_router.router, prefix="/prof", tags=["professor"])
 app.include_router(student_router.router, prefix="/student", tags=["student"])
-app.include_router(grading_router.router, prefix="/grade", tags=["grading"])

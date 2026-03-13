@@ -3,8 +3,8 @@ import axios from "axios";
 export const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000",
-  withCredentials: true, // VERY important
+  baseURL: API_BASE,
+  withCredentials: true,
 });
 
 http.interceptors.response.use(
@@ -17,7 +17,7 @@ http.interceptors.response.use(
   }
 );
 
-// ✅ AUTH
+// ── Auth ──────────────────────────────────────────────────────────────────────
 export async function register(email, password, role) {
   const { data } = await http.post("/auth/register", { email, password, role });
   return data;
@@ -32,9 +32,14 @@ export async function logout() {
   await http.post("/auth/logout");
 }
 
-// ✅ PROFESSOR
+// ── Professor ─────────────────────────────────────────────────────────────────
 export async function createExam(payload) {
   const { data } = await http.post("/prof/exams", payload);
+  return data;
+}
+
+export async function getMyExams() {
+  const { data } = await http.get("/prof/exams");
   return data;
 }
 
@@ -45,12 +50,36 @@ export async function uploadSolutionPdf(examId, file) {
   return data;
 }
 
+export async function getExamSubmissions(examId) {
+  const { data } = await http.get(`/prof/exams/${examId}/submissions`);
+  return data;
+}
+
+export async function getExamStats(examId) {
+  const { data } = await http.get(`/prof/exams/${examId}/stats`);
+  return data;
+}
+
 export async function fetchFlags(examId) {
   const { data } = await http.get(`/prof/exams/${examId}/flags`);
   return data;
 }
 
-// ✅ STUDENT
+export async function extendDeadline(examId, due_at) {
+  const { data } = await http.patch(`/prof/exams/${examId}/extend`, { due_at });
+  return data;
+}
+
+export function exportCsvUrl(examId) {
+  return `${API_BASE}/prof/exams/${examId}/export_csv`;
+}
+
+export async function getSubmissionDetail(submissionId) {
+  const { data } = await http.get(`/prof/submissions/${submissionId}`);
+  return data;
+}
+
+// ── Student ───────────────────────────────────────────────────────────────────
 export async function listOpenExams() {
   const { data } = await http.get("/student/exams/open");
   return data;
@@ -63,19 +92,7 @@ export async function submitPdf(examId, file) {
   return data;
 }
 
-export async function getGrade(submissionId) {
-  const { data } = await http.get(`/grade/submissions/${submissionId}`);
-  return data;
-}
-
-// NEW: Fetch exams created by professor
-export async function getMyExams() {
-  const { data } = await http.get("/prof/exams");
-  return data;
-}
-
-// NEW: Fetch student submissions for a given exam
-export async function getExamSubmissions(examId) {
-  const { data } = await http.get(`/prof/exams/${examId}/submissions`);
+export async function getMySubmissions() {
+  const { data } = await http.get("/student/submissions");
   return data;
 }

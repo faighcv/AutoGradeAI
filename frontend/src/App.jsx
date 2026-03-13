@@ -5,22 +5,35 @@ import Dashboard from "./pages/Dashboard";
 import { AuthProvider, useAuth } from "./auth";
 import NavBar from "./components/NavBar";
 
-function PrivateOutlet() {
+// Show NavBar only on authenticated pages
+function AppShell() {
   const { user } = useAuth();
-  return user ? <Dashboard /> : <Navigate to="/login" replace />;
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login"    element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="*"         element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <>
+      <NavBar />
+      <Routes>
+        <Route path="/app" element={<Dashboard />} />
+        <Route path="*"    element={<Navigate to="/app" replace />} />
+      </Routes>
+    </>
+  );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <NavBar />
-      <Routes>
-          <Route path="/" element={<Navigate to="/app" replace />} />
-          <Route path="/app" element={<PrivateOutlet />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/app" replace />} />
-      </Routes>
+      <AppShell />
     </AuthProvider>
   );
 }

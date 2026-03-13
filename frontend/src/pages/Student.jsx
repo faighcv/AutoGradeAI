@@ -1,49 +1,32 @@
 import { useEffect, useState, useCallback } from "react";
 import * as api from "../api";
 
-// ── Grade breakdown display ───────────────────────────────────────────────────
+// ── Grade breakdown ───────────────────────────────────────────────────────────
 
-function GradeBreakdown({ breakdown, examTotal }) {
-  if (!breakdown || Object.keys(breakdown).length === 0) {
-    return <p className="muted">No breakdown available.</p>;
-  }
-
+function Breakdown({ breakdown }) {
+  if (!breakdown || !Object.keys(breakdown).length)
+    return <p className="text-muted text-sm">No breakdown available.</p>;
   return (
     <div className="breakdown-grid">
       {Object.entries(breakdown).map(([qId, data]) => {
-        const pts = data?.points ?? 0;
         const fb = data?.feedback || {};
-        const maxPts = examTotal
-          ? Math.round((examTotal / Object.keys(breakdown).length) * 10) / 10
-          : null;
-
         return (
           <div key={qId} className="breakdown-card">
-            <div className="breakdown-header">
+            <div className="breakdown-head">
               <span className="breakdown-q">Question {qId}</span>
-              <span className="breakdown-pts">{pts} pts</span>
+              <span className="breakdown-pts">{data?.points ?? 0} pts</span>
             </div>
-            {fb.rationale && (
-              <p className="breakdown-rationale">{fb.rationale}</p>
-            )}
+            {fb.rationale && <p className="breakdown-rationale">{fb.rationale}</p>}
             {fb.strengths?.length > 0 && (
               <div className="breakdown-section">
-                <span className="label-success">✓ Strengths</span>
-                <ul>
-                  {fb.strengths.map((s, i) => (
-                    <li key={i}>{s}</li>
-                  ))}
-                </ul>
+                <div className="breakdown-section-label label-success">✓ Strengths</div>
+                <ul>{fb.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
               </div>
             )}
             {fb.missing?.length > 0 && (
               <div className="breakdown-section">
-                <span className="label-danger">✗ Missing</span>
-                <ul>
-                  {fb.missing.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
-                </ul>
+                <div className="breakdown-section-label label-danger">✗ Missing</div>
+                <ul>{fb.missing.map((m, i) => <li key={i}>{m}</li>)}</ul>
               </div>
             )}
           </div>
@@ -53,206 +36,217 @@ function GradeBreakdown({ breakdown, examTotal }) {
   );
 }
 
-// ── Submission history item ───────────────────────────────────────────────────
+// ── Grade colour helper ───────────────────────────────────────────────────────
+
+function GradePill({ total }) {
+  if (total === null || total === undefined)
+    return <span className="badge badge-muted">Pending</span>;
+  const cls = total >= 80 ? "grade-pill-good" : total >= 50 ? "grade-pill-ok" : "grade-pill-poor";
+  return <span className={`grade-pill ${cls}`}>{total} / 100</span>;
+}
+
+function GradeNum({ total }) {
+  const cls = total >= 80 ? "grade-excellent" : total >= 50 ? "grade-good" : "grade-poor";
+  return (
+    <div className="grade-hero">
+      <span className={`grade-num ${cls}`}>{total}</span>
+      <span className="grade-denom">/ 100 points</span>
+    </div>
+  );
+}
+
+// ── History item ──────────────────────────────────────────────────────────────
 
 function HistoryItem({ sub }) {
   const [open, setOpen] = useState(false);
-
-  const pct =
-    sub.grade_total !== null ? Math.round(sub.grade_total) : null;
-  const color =
-    pct === null ? "" : pct >= 80 ? "text-success" : pct >= 50 ? "text-warn" : "text-danger";
-
   return (
     <div className="history-item">
-      <div
-        className="history-item-header"
-        onClick={() => setOpen((v) => !v)}
-        style={{ cursor: "pointer" }}
-      >
+      <div className="history-head" onClick={() => setOpen(v => !v)}>
         <div>
-          <div className="history-exam-title">{sub.exam_title}</div>
-          <div className="muted" style={{ fontSize: "0.8rem" }}>
-            Submitted {new Date(sub.submitted_at).toLocaleString()}
-          </div>
+          <div className="history-exam">{sub.exam_title}</div>
+          <div className="history-date">{new Date(sub.submitted_at).toLocaleString()}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {pct !== null ? (
-            <span className={`grade-pill ${color}`}>{pct} / 100</span>
-          ) : (
-            <span className="badge badge-muted">{sub.status}</span>
-          )}
-          <span className="muted">{open ? "▲" : "▼"}</span>
+        <div className="history-right">
+          <GradePill total={sub.grade_total} />
+          <span className="text-muted text-sm">{open ? "▲" : "▼"}</span>
         </div>
       </div>
       {open && (
-        <div className="history-breakdown">
-          <GradeBreakdown breakdown={sub.breakdown} examTotal={sub.grade_total} />
+        <div className="history-body">
+          <Breakdown breakdown={sub.breakdown} />
         </div>
       )}
     </div>
   );
 }
 
-// ── Root Student component ────────────────────────────────────────────────────
+// ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function Student() {
-  const [activeTab, setActiveTab] = useState("submit");
-  const [openExams, setOpenExams] = useState([]);
-  const [mySubmissions, setMySubmissions] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [pdf, setPdf] = useState(null);
-  const [result, setResult] = useState(null);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
+  const [tab, setTab]         = useState("submit");
+  const [openExams, setOpenExams]   = useState([]);
+  const [mySubmissions, setMySubs]  = useState([]);
+  const [selected, setSelected]     = useState(null);
+  const [pdf, setPdf]               = useState(null);
+  const [result, setResult]         = useState(null);
+  const [err, setErr]               = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const loadOpen = useCallback(async () => {
-    try {
-      setOpenExams(await api.listOpenExams());
-    } catch {
-      setErr("Failed to load open exams");
-    }
+    try { setOpenExams(await api.listOpenExams()); } catch {}
   }, []);
 
   const loadHistory = useCallback(async () => {
-    try {
-      setMySubmissions(await api.getMySubmissions());
-    } catch {
-      console.error("Failed to load submission history");
-    }
+    try { setMySubs(await api.getMySubmissions()); } catch {}
   }, []);
 
-  useEffect(() => {
-    loadOpen();
-    loadHistory();
-  }, [loadOpen, loadHistory]);
+  useEffect(() => { loadOpen(); loadHistory(); }, [loadOpen, loadHistory]);
 
   const submit = async () => {
-    setErr("");
-    setMsg("");
-    setResult(null);
-    setSubmitting(true);
+    setErr(""); setResult(null); setSubmitting(true);
     try {
       const r = await api.submitPdf(selected.id, pdf);
       setResult(r);
-      setMsg("Submission received and graded!");
-      setPdf(null);
-      setSelected(null);
-      loadOpen();
-      loadHistory();
+      setPdf(null); setSelected(null);
+      loadOpen(); loadHistory();
+      setTab("submit"); // stay on submit tab to show result
     } catch (e) {
       setErr(e?.response?.data?.detail || "Submission failed");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   return (
-    <div className="container">
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "submit" ? "active" : ""}`}
-          onClick={() => setActiveTab("submit")}
-        >
+    <div className="container content">
+      <div className="tabs-bar">
+        <button className={`tab-btn ${tab === "submit" ? "active" : ""}`} onClick={() => setTab("submit")}>
           Submit Exam
         </button>
-        <button
-          className={`tab ${activeTab === "history" ? "active" : ""}`}
-          onClick={() => setActiveTab("history")}
-        >
-          My Grades ({mySubmissions.length})
+        <button className={`tab-btn ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>
+          My Grades
+          <span className="tab-badge">{mySubmissions.length}</span>
         </button>
       </div>
 
-      {/* ── Submit tab ── */}
-      {activeTab === "submit" && (
-        <div className="grid2">
-          <div className="card">
-            <h2>Open Exams</h2>
-            {openExams.length === 0 ? (
-              <p className="muted">No open exams right now.</p>
-            ) : (
-              <ul className="list">
-                {openExams.map((e) => (
-                  <li
-                    key={e.id}
-                    className={selected?.id === e.id ? "sel" : ""}
-                    onClick={() => {
-                      setSelected(e);
-                      setResult(null);
-                      setMsg("");
-                      setErr("");
-                      setPdf(null);
-                    }}
-                  >
-                    <div className="title">{e.title}</div>
-                    <div className="muted">
-                      Due: {new Date(e.due_at).toLocaleString()}
+      {/* ── Submit tab ─────────────────────────────── */}
+      {tab === "submit" && (
+        <div>
+          {/* Grade result */}
+          {result && (
+            <div className="card mb-16" style={{ marginBottom: 24 }}>
+              <div className="alert alert-success mb-16">Your exam was submitted and graded.</div>
+              <GradeNum total={result.grade_total} />
+              <div className="divider" />
+              <h3 style={{ marginBottom: 12 }}>Question Breakdown</h3>
+              <Breakdown breakdown={result.breakdown} />
+            </div>
+          )}
+
+          <div className="grid2">
+            {/* Exam list */}
+            <div>
+              <h2 style={{ marginBottom: 16 }}>Open Exams</h2>
+              {openExams.length === 0 ? (
+                <div className="empty" style={{ padding: "32px 0" }}>
+                  <div className="empty-icon">📋</div>
+                  <div className="empty-title">No open exams</div>
+                  <div className="empty-desc">Check back later for upcoming exams.</div>
+                </div>
+              ) : (
+                <div className="exam-list">
+                  {openExams.map(e => (
+                    <div
+                      key={e.id}
+                      className={`exam-list-item ${selected?.id === e.id ? "selected" : ""}`}
+                      onClick={() => { setSelected(e); setResult(null); setErr(""); setPdf(null); }}
+                    >
+                      <div>
+                        <div className="exam-list-title">{e.title}</div>
+                        <div className="exam-list-due">Due {new Date(e.due_at).toLocaleString()}</div>
+                      </div>
+                      <span className="badge badge-success">Open</span>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Upload panel */}
+            {selected ? (
+              <div>
+                <h2 style={{ marginBottom: 16 }}>Submit Your Answers</h2>
+                <div className="card">
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontWeight: 700, fontSize: "1rem" }}>{selected.title}</div>
+                    <div className="text-muted text-sm mt-4">
+                      Due {new Date(selected.due_at).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label
+                      className={`file-drop ${pdf ? "has-file" : ""}`}
+                      style={{ flexDirection: "column" }}
+                    >
+                      <input type="file" accept="application/pdf"
+                        onChange={e => { setPdf(e.target.files?.[0] || null); setErr(""); }} />
+                      {pdf ? (
+                        <>
+                          <span style={{ fontSize: "1.5rem" }}>📄</span>
+                          <span style={{ fontWeight: 600 }}>{pdf.name}</span>
+                          <span className="text-sm">Click to change file</span>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: "1.5rem" }}>📤</span>
+                          <span style={{ fontWeight: 600 }}>Click to upload PDF</span>
+                          <span className="text-sm">Your completed exam as a PDF</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+
+                  {err && <div className="alert alert-error mb-16">{err}</div>}
+
+                  {submitting && (
+                    <div className="alert alert-info mb-16">
+                      ⏳ Grading in progress — this takes 20–60 seconds. Please wait…
+                    </div>
+                  )}
+
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    disabled={!pdf || submitting}
+                    onClick={submit}
+                  >
+                    {submitting ? "Grading…" : "Submit & Grade"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              !result && (
+                <div className="empty" style={{ padding: "32px 0" }}>
+                  <div className="empty-icon">👈</div>
+                  <div className="empty-title">Select an exam</div>
+                  <div className="empty-desc">Choose an open exam on the left to upload your PDF.</div>
+                </div>
+              )
             )}
           </div>
-
-          {selected && (
-            <div className="card">
-              <h2>Upload your answers</h2>
-              <p className="muted">
-                Exam: <strong>{selected.title}</strong>
-              </p>
-              <p className="muted" style={{ fontSize: "0.85rem" }}>
-                Due: {new Date(selected.due_at).toLocaleString()}
-              </p>
-              <label className="form-group">
-                <span>Answer PDF</span>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setPdf(e.target.files?.[0] || null)}
-                />
-              </label>
-              <button
-                className="btn-primary"
-                disabled={!pdf || submitting}
-                onClick={submit}
-              >
-                {submitting ? "Grading… (this may take a minute)" : "Submit & Grade"}
-              </button>
-              {err && <div className="banner error">{err}</div>}
-            </div>
-          )}
-
-          {result && (
-            <div className="card full">
-              <div className="banner success">{msg}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "16px 0" }}>
-                <span className="grade">{result.grade_total}</span>
-                <span className="muted">/ 100 points</span>
-              </div>
-              <h3>Question Breakdown</h3>
-              <GradeBreakdown breakdown={result.breakdown} examTotal={result.grade_total} />
-            </div>
-          )}
         </div>
       )}
 
-      {/* ── History tab ── */}
-      {activeTab === "history" && (
-        <div>
-          {mySubmissions.length === 0 ? (
-            <div className="empty-state">
-              <p>You haven't submitted any exams yet.</p>
+      {/* ── History tab ────────────────────────────── */}
+      {tab === "history" && (
+        mySubmissions.length === 0
+          ? <div className="empty">
+              <div className="empty-icon">📊</div>
+              <div className="empty-title">No submissions yet</div>
+              <div className="empty-desc">Your grades will appear here after you submit exams.</div>
             </div>
-          ) : (
-            <div className="history-list">
-              {mySubmissions.map((s) => (
-                <HistoryItem key={s.submission_id} sub={s} />
-              ))}
+          : <div className="history-list">
+              {mySubmissions.map(s => <HistoryItem key={s.submission_id} sub={s} />)}
             </div>
-          )}
-        </div>
       )}
     </div>
   );

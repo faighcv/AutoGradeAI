@@ -1,39 +1,63 @@
 import { useState, useEffect, useCallback } from "react";
 import * as api from "../api";
 
-// ── Small reusable components ─────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-function SeverityBadge({ severity }) {
-  return (
-    <span className={`badge badge-${severity === "HIGH" ? "danger" : "warn"}`}>
-      {severity}
-    </span>
-  );
+function gradeColor(v) {
+  if (v === null || v === undefined) return "";
+  return v >= 80 ? "grade-excellent" : v >= 50 ? "grade-good" : "grade-poor";
 }
 
-function StatCard({ label, value, sub }) {
+// ── Grade breakdown panel ─────────────────────────────────────────────────────
+
+function Breakdown({ breakdown }) {
+  if (!breakdown || !Object.keys(breakdown).length)
+    return <p className="text-muted text-sm">No breakdown available.</p>;
   return (
-    <div className="stat-card">
-      <div className="stat-value">{value ?? "—"}</div>
-      <div className="stat-label">{label}</div>
-      {sub && <div className="stat-sub">{sub}</div>}
+    <div className="breakdown-grid">
+      {Object.entries(breakdown).map(([qId, data]) => {
+        const fb = data?.feedback || {};
+        return (
+          <div key={qId} className="breakdown-card">
+            <div className="breakdown-head">
+              <span className="breakdown-q">Question {qId}</span>
+              <span className="breakdown-pts">{data?.points ?? 0} pts</span>
+            </div>
+            {fb.rationale && <p className="breakdown-rationale">{fb.rationale}</p>}
+            {fb.strengths?.length > 0 && (
+              <div className="breakdown-section">
+                <div className="breakdown-section-label label-success">✓ Strengths</div>
+                <ul>{fb.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+              </div>
+            )}
+            {fb.missing?.length > 0 && (
+              <div className="breakdown-section">
+                <div className="breakdown-section-label label-danger">✗ Missing</div>
+                <ul>{fb.missing.map((m, i) => <li key={i}>{m}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// ── Exam detail panel ─────────────────────────────────────────────────────────
+// ── Exam detail view ──────────────────────────────────────────────────────────
 
 function ExamDetail({ exam, onBack, onRefresh }) {
-  const [innerTab, setInnerTab] = useState("submissions");
+  const [tab, setTab]               = useState("submissions");
   const [submissions, setSubmissions] = useState([]);
-  const [flags, setFlags] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [pdf, setPdf] = useState(null);
-  const [uploadMsg, setUploadMsg] = useState("");
-  const [uploadErr, setUploadErr] = useState("");
-  const [extendDate, setExtendDate] = useState("");
-  const [extendMsg, setExtendMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [flags, setFlags]             = useState([]);
+  const [stats, setStats]             = useState(null);
+  const [pdf, setPdf]                 = useState(null);
+  const [uploadMsg, setUploadMsg]     = useState("");
+  const [uploadErr, setUploadErr]     = useState("");
+  const [uploading, setUploading]     = useState(false);
+  const [extendVal, setExtendVal]     = useState("");
+  const [extendMsg, setExtendMsg]     = useState("");
+  const [expandedSub, setExpandedSub] = useState(null);
+  const [subDetail, setSubDetail]     = useState({});
 
   const load = useCallback(async () => {
     try {
@@ -45,397 +69,397 @@ function ExamDetail({ exam, onBack, onRefresh }) {
       setSubmissions(subs);
       setFlags(fs);
       setStats(st);
-    } catch (e) {
-      console.error("Failed to load exam detail:", e);
-    }
+    } catch {}
   }, [exam.id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const uploadSolution = async () => {
+  const doUpload = async () => {
     if (!pdf) return;
-    setUploadErr("");
-    setUploadMsg("");
-    setLoading(true);
+    setUploadMsg(""); setUploadErr(""); setUploading(true);
     try {
-      const res = await api.uploadSolutionPdf(exam.id, pdf);
-      setUploadMsg(
-        `Solution uploaded! Detected ${res.questions_detected} question(s), ${res.total_points} total pts.`
-      );
+      const r = await api.uploadSolutionPdf(exam.id, pdf);
+      setUploadMsg(`Done! ${r.questions_detected} question(s) detected, ${r.total_points} pts total.`);
       setPdf(null);
-      load();
-      onRefresh();
+      load(); onRefresh();
     } catch (e) {
       setUploadErr(e?.response?.data?.detail || "Upload failed");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setUploading(false); }
   };
 
   const doExtend = async () => {
-    if (!extendDate) return;
+    if (!extendVal) return;
     setExtendMsg("");
     try {
-      const iso = new Date(extendDate).toISOString();
-      await api.extendDeadline(exam.id, iso);
-      setExtendMsg("Deadline extended successfully.");
-      setExtendDate("");
-      onRefresh();
-    } catch (e) {
-      setExtendMsg(e?.response?.data?.detail || "Failed to extend deadline");
+      await api.extendDeadline(exam.id, new Date(extendVal).toISOString());
+      setExtendMsg("Deadline extended!"); setExtendVal(""); onRefresh();
+    } catch (e) { setExtendMsg(e?.response?.data?.detail || "Failed"); }
+  };
+
+  const toggleSub = async (subId) => {
+    if (expandedSub === subId) { setExpandedSub(null); return; }
+    setExpandedSub(subId);
+    if (!subDetail[subId]) {
+      try {
+        const d = await api.getSubmissionDetail(subId);
+        setSubDetail(prev => ({ ...prev, [subId]: d }));
+      } catch {}
     }
   };
 
   const isPast = new Date(exam.due_at) < new Date();
 
   return (
-    <div className="exam-detail">
-      <div className="exam-detail-header">
-        <button className="btn-ghost" onClick={onBack}>← Back to exams</button>
-        <div>
-          <h2>{exam.title}</h2>
-          <span className={`badge ${isPast ? "badge-muted" : "badge-success"}`}>
-            {isPast ? "Closed" : "Open"}
-          </span>
-          <span className="muted" style={{ marginLeft: 12, fontSize: "0.85rem" }}>
-            Due: {new Date(exam.due_at).toLocaleString()}
-          </span>
+    <div className="container content">
+      {/* Header */}
+      <div className="detail-header">
+        <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>← Back</button>
+        <div style={{ flex: 1 }}>
+          <div className="detail-title">{exam.title}</div>
+          <div className="detail-meta">
+            Exam ID #{exam.id} · Due {new Date(exam.due_at).toLocaleString()}
+          </div>
+          <div className="detail-badges">
+            <span className={`badge ${isPast ? "badge-muted" : "badge-success"}`}>
+              {isPast ? "Closed" : "Open"}
+            </span>
+            {exam.has_solution
+              ? <span className="badge badge-success">✓ Solution uploaded</span>
+              : <span className="badge badge-warn">⚠ No solution yet</span>}
+            {exam.flag_count > 0 &&
+              <span className="badge badge-danger">⚠ {exam.flag_count} integrity flag{exam.flag_count > 1 ? "s" : ""}</span>}
+          </div>
         </div>
       </div>
 
-      {/* Stats row */}
+      {/* Stats */}
       {stats && (
-        <div className="stats-row">
-          <StatCard label="Submissions" value={stats.total_submissions} />
-          <StatCard label="Graded" value={stats.graded_count} />
-          <StatCard label="Average" value={stats.average !== null ? `${stats.average}` : null} sub="/ 100 pts" />
-          <StatCard label="Min" value={stats.min} />
-          <StatCard label="Max" value={stats.max} />
-          <StatCard
-            label="Integrity Alerts"
-            value={stats.cheating_flags > 0 ? `⚠ ${stats.cheating_flags}` : "0"}
-          />
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-val">{stats.total_submissions}</div>
+            <div className="stat-label">Submissions</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-val">{stats.graded_count}</div>
+            <div className="stat-label">Graded</div>
+          </div>
+          <div className={`stat-card ${stats.average !== null ? "" : ""}`}>
+            <div className="stat-val">{stats.average ?? "—"}</div>
+            <div className="stat-label">Avg Score</div>
+            <div className="stat-sub">out of 100</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-val">{stats.min ?? "—"}</div>
+            <div className="stat-label">Min</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-val">{stats.max ?? "—"}</div>
+            <div className="stat-label">Max</div>
+          </div>
+          <div className={`stat-card ${stats.cheating_flags > 0 ? "stat-danger" : ""}`}>
+            <div className="stat-val">{stats.cheating_flags}</div>
+            <div className="stat-label">Integrity Alerts</div>
+          </div>
         </div>
       )}
 
-      {/* Action bar */}
-      <div className="action-bar">
-        <div className="action-group">
-          <span className="muted" style={{ fontSize: "0.85rem" }}>Solution PDF:</span>
-          <label className="btn-outline file-btn">
-            {pdf ? pdf.name : exam.has_solution ? "Replace solution" : "Upload solution"}
-            <input
-              type="file"
-              accept="application/pdf"
-              style={{ display: "none" }}
-              onChange={(e) => { setPdf(e.target.files?.[0] || null); setUploadMsg(""); setUploadErr(""); }}
-            />
+      {/* Action row */}
+      <div className="action-row">
+        {/* Upload solution */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <label className={`file-drop ${pdf ? "has-file" : ""}`} style={{ padding: "8px 16px", minWidth: 180 }}>
+            <input type="file" accept="application/pdf"
+              onChange={e => { setPdf(e.target.files?.[0] || null); setUploadMsg(""); setUploadErr(""); }} />
+            {pdf ? `📄 ${pdf.name}` : (exam.has_solution ? "Replace solution PDF" : "Upload solution PDF")}
           </label>
           {pdf && (
-            <button className="btn-primary" onClick={uploadSolution} disabled={loading}>
-              {loading ? "Processing…" : "Upload & Process"}
+            <button className="btn btn-primary" onClick={doUpload} disabled={uploading}>
+              {uploading ? "Processing…" : "Process"}
             </button>
           )}
-          {uploadMsg && <span className="text-success">{uploadMsg}</span>}
-          {uploadErr && <span className="text-danger">{uploadErr}</span>}
+          {uploadMsg && <span className="text-success text-sm">{uploadMsg}</span>}
+          {uploadErr && <span className="text-danger text-sm">{uploadErr}</span>}
         </div>
 
-        <div className="action-group">
-          <span className="muted" style={{ fontSize: "0.85rem" }}>Extend deadline:</span>
+        <div className="action-sep" />
+
+        {/* Extend deadline */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input
-            type="datetime-local"
-            value={extendDate}
-            onChange={(e) => setExtendDate(e.target.value)}
-            style={{ padding: "6px 10px" }}
+            className="form-input" type="datetime-local" value={extendVal}
+            onChange={e => setExtendVal(e.target.value)}
+            style={{ width: "auto", padding: "7px 12px" }}
           />
-          <button className="btn-outline" onClick={doExtend} disabled={!extendDate}>
-            Extend
+          <button className="btn btn-secondary" onClick={doExtend} disabled={!extendVal}>
+            Extend deadline
           </button>
-          {extendMsg && <span className="text-success">{extendMsg}</span>}
+          {extendMsg && <span className="text-success text-sm">{extendMsg}</span>}
         </div>
 
-        <a
-          href={api.exportCsvUrl(exam.id)}
-          className="btn-outline"
-          download
-        >
+        <div className="action-sep" />
+
+        <a className="btn btn-secondary" href={api.exportCsvUrl(exam.id)} download>
           ⬇ Export CSV
         </a>
       </div>
 
-      {/* Inner tabs */}
-      <div className="tabs">
-        <button
-          className={`tab ${innerTab === "submissions" ? "active" : ""}`}
-          onClick={() => setInnerTab("submissions")}
-        >
-          Submissions ({submissions.length})
+      {/* Tabs */}
+      <div className="tabs-bar">
+        <button className={`tab-btn ${tab === "submissions" ? "active" : ""}`} onClick={() => setTab("submissions")}>
+          Submissions
+          <span className="tab-badge">{submissions.length}</span>
         </button>
-        <button
-          className={`tab ${innerTab === "integrity" ? "active" : ""}`}
-          onClick={() => setInnerTab("integrity")}
-        >
-          {flags.length > 0 && <span className="tab-alert">⚠</span>}
-          Academic Integrity ({flags.length})
+        <button className={`tab-btn ${tab === "integrity" ? "active" : ""}`} onClick={() => setTab("integrity")}>
+          Academic Integrity
+          {flags.length > 0
+            ? <span className="tab-badge warn">{flags.length}</span>
+            : <span className="tab-badge">{flags.length}</span>}
         </button>
       </div>
 
       {/* Submissions tab */}
-      {innerTab === "submissions" && (
-        <div>
-          {submissions.length === 0 ? (
-            <p className="muted">No submissions yet.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Student</th>
-                  <th>Submitted</th>
-                  <th>Status</th>
-                  <th>Grade</th>
-                  <th>Flag</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.map((s) => (
-                  <tr key={s.submission_id} className={s.flagged ? "row-flagged" : ""}>
-                    <td className="muted">{s.submission_id}</td>
-                    <td>{s.student_email}</td>
-                    <td className="muted">{new Date(s.submitted_at).toLocaleString()}</td>
-                    <td>
-                      <span className={`badge ${s.status === "GRADED" ? "badge-success" : "badge-muted"}`}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td>
-                      {s.grade_total !== null ? (
-                        <strong>{s.grade_total} / 100</strong>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td>
-                      {s.flagged && <span className="badge badge-danger">⚠ Flagged</span>}
-                    </td>
+      {tab === "submissions" && (
+        submissions.length === 0
+          ? <div className="empty">
+              <div className="empty-icon">📭</div>
+              <div className="empty-title">No submissions yet</div>
+              <div className="empty-desc">Students will appear here once they submit their PDFs.</div>
+            </div>
+          : <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Student</th>
+                    <th>Submitted</th>
+                    <th>Status</th>
+                    <th>Grade</th>
+                    <th>Flag</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                </thead>
+                <tbody>
+                  {submissions.map(s => (
+                    <>
+                      <tr key={s.submission_id} className={s.flagged ? "row-flagged" : ""}>
+                        <td className="text-muted text-sm">{s.submission_id}</td>
+                        <td style={{ fontWeight: 600 }}>{s.student_email}</td>
+                        <td className="text-muted text-sm">{new Date(s.submitted_at).toLocaleString()}</td>
+                        <td>
+                          <span className={`badge ${s.status === "GRADED" ? "badge-success" : "badge-muted"}`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td>
+                          {s.grade_total !== null
+                            ? <span className={`fw-700 ${gradeColor(s.grade_total)}`}>{s.grade_total} / 100</span>
+                            : <span className="text-muted">—</span>}
+                        </td>
+                        <td>{s.flagged && <span className="badge badge-danger">⚠ Flagged</span>}</td>
+                        <td>
+                          {s.status === "GRADED" && (
+                            <button
+                              className="btn btn-ghost text-sm"
+                              onClick={() => toggleSub(s.submission_id)}
+                            >
+                              {expandedSub === s.submission_id ? "▲ Hide" : "▼ Details"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedSub === s.submission_id && subDetail[s.submission_id] && (
+                        <tr key={`${s.submission_id}-detail`}>
+                          <td colSpan={7} style={{ padding: "16px 14px", background: "var(--surface2)" }}>
+                            <Breakdown breakdown={subDetail[s.submission_id].breakdown} />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
       )}
 
       {/* Academic integrity tab */}
-      {innerTab === "integrity" && (
-        <div>
-          {flags.length === 0 ? (
-            <div className="integrity-empty">
-              <div style={{ fontSize: "2rem" }}>✅</div>
-              <p>No suspicious similarity detected among submissions.</p>
+      {tab === "integrity" && (
+        flags.length === 0
+          ? <div className="integrity-ok">
+              <div className="ok-icon">✅</div>
+              <div style={{ fontWeight: 600, color: "var(--text2)" }}>No suspicious similarity detected</div>
+              <div className="text-muted text-sm">Checks run automatically after each submission.</div>
             </div>
-          ) : (
-            <div>
-              <p className="muted" style={{ marginBottom: 12 }}>
-                The following pairs were flagged based on document-level text similarity.
-                Review carefully before taking action.
-              </p>
-              <div className="flag-list">
-                {flags.map((f) => (
-                  <div
-                    key={f.id}
-                    className={`flag-card flag-${f.severity.toLowerCase()}`}
-                  >
-                    <div className="flag-header">
-                      <SeverityBadge severity={f.severity} />
-                      <span className="flag-pair">
-                        <strong>{f.student_a_email}</strong>
-                        <span className="muted"> vs </span>
-                        <strong>{f.student_b_email}</strong>
+          : <div>
+              <div className="alert alert-warn mb-16">
+                These pairs were flagged based on document-level text similarity. Review carefully before taking action.
+              </div>
+              <div className="flags-list">
+                {flags.map(f => (
+                  <div key={f.id} className={`flag-card flag-${f.severity.toLowerCase()}`}>
+                    <div className="flag-top">
+                      <span className={`badge ${f.severity === "HIGH" ? "badge-danger" : "badge-warn"}`}>
+                        {f.severity}
                       </span>
+                      <div className="flag-emails">
+                        <strong>{f.student_a_email}</strong>
+                        <span className="vs">vs</span>
+                        <strong>{f.student_b_email}</strong>
+                      </div>
                     </div>
                     <div className="flag-scores">
                       <span>Semantic similarity: <strong>{(f.sem * 100).toFixed(1)}%</strong></span>
                       <span>Jaccard similarity: <strong>{(f.jacc * 100).toFixed(1)}%</strong></span>
                     </div>
-                    <div className="flag-reason muted">{f.reason}</div>
-                    <div className="flag-meta muted">
-                      Submission #{f.submission_a} & #{f.submission_b}
+                    <div className="flag-reason">{f.reason}</div>
+                    <div className="flag-sub-ids">
+                      Submission #{f.submission_a} · Submission #{f.submission_b}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </div>
       )}
     </div>
   );
 }
 
-// ── Exam list card ─────────────────────────────────────────────────────────────
+// ── Create exam form ──────────────────────────────────────────────────────────
+
+function CreateExam({ onCreate }) {
+  const [title, setTitle] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [err, setErr]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const toIsoUtc = (s) => {
+    if (!s) return null;
+    const d = new Date(s.includes("T") ? s : s.replace(" ", "T"));
+    if (isNaN(d)) return null;
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+  };
+
+  const submit = async () => {
+    setErr("");
+    if (!title.trim()) { setErr("Title is required"); return; }
+    const iso = toIsoUtc(dueAt);
+    if (!iso) { setErr("Please select a valid deadline"); return; }
+    setLoading(true);
+    try {
+      await api.createExam({ title, due_at: iso });
+      setTitle(""); setDueAt("");
+      onCreate();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Failed to create exam");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="card" style={{ maxWidth: 480 }}>
+      <h2 style={{ marginBottom: 20 }}>New Exam</h2>
+      <div className="form-field">
+        <label className="form-label">Exam title</label>
+        <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm 1" />
+      </div>
+      <div className="form-field">
+        <label className="form-label">Submission deadline</label>
+        <input className="form-input" type="datetime-local" value={dueAt} onChange={e => setDueAt(e.target.value)} />
+        <span className="form-hint">Date/time in your local timezone</span>
+      </div>
+      {err && <div className="alert alert-error mb-16">{err}</div>}
+      <button className="btn btn-primary" onClick={submit} disabled={loading}>
+        {loading ? "Creating…" : "Create exam"}
+      </button>
+    </div>
+  );
+}
+
+// ── Exam card ─────────────────────────────────────────────────────────────────
 
 function ExamCard({ exam, onClick }) {
   const isPast = new Date(exam.due_at) < new Date();
   return (
     <div className="exam-card" onClick={onClick}>
-      <div className="exam-card-top">
-        <span className="exam-card-title">{exam.title}</span>
-        <span className={`badge ${isPast ? "badge-muted" : "badge-success"}`}>
-          {isPast ? "Closed" : "Open"}
-        </span>
-        {exam.flag_count > 0 && (
-          <span className="badge badge-danger">⚠ {exam.flag_count} flag{exam.flag_count > 1 ? "s" : ""}</span>
-        )}
+      <div className="exam-card-header">
+        <div className="exam-card-title">{exam.title}</div>
+        <div className="exam-card-flags">
+          <span className={`badge ${isPast ? "badge-muted" : "badge-success"}`}>
+            {isPast ? "Closed" : "Open"}
+          </span>
+          {exam.flag_count > 0 &&
+            <span className="badge badge-danger">⚠ {exam.flag_count}</span>}
+        </div>
       </div>
-      <div className="exam-card-meta muted">
-        Due {new Date(exam.due_at).toLocaleString()}
+      <div className="exam-card-meta">Due {new Date(exam.due_at).toLocaleString()}</div>
+      <div className={`exam-card-solution ${exam.has_solution ? "solution-ok" : "solution-miss"}`}>
+        {exam.has_solution ? "✓ Solution uploaded" : "⚠ No solution PDF yet"}
       </div>
       <div className="exam-card-stats">
-        <span>{exam.submission_count} submission{exam.submission_count !== 1 ? "s" : ""}</span>
-        <span>{exam.graded_count} graded</span>
-        <span>{exam.has_solution ? "✓ Solution uploaded" : "⚠ No solution yet"}</span>
+        <div className="exam-stat">
+          <div className="exam-stat-val">{exam.submission_count}</div>
+          <div className="exam-stat-label">Submitted</div>
+        </div>
+        <div className="exam-stat">
+          <div className="exam-stat-val">{exam.graded_count}</div>
+          <div className="exam-stat-label">Graded</div>
+        </div>
+        <div className="exam-stat">
+          <div className="exam-stat-val" style={{ color: exam.flag_count > 0 ? "var(--danger)" : "var(--success)" }}>
+            {exam.flag_count}
+          </div>
+          <div className="exam-stat-label">Flags</div>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Create exam form ───────────────────────────────────────────────────────────
-
-function CreateExam({ onCreate }) {
-  const [title, setTitle] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-
-  const toIsoUtc = (s) => {
-    if (!s) return null;
-    const normalized = s.includes("T") ? s : s.replace(" ", "T");
-    const local = new Date(normalized);
-    if (Number.isNaN(local.getTime())) return null;
-    return new Date(local.getTime() - local.getTimezoneOffset() * 60000).toISOString();
-  };
-
-  const submit = async () => {
-    setErr("");
-    setMsg("");
-    const iso = toIsoUtc(dueAt);
-    if (!title.trim()) { setErr("Title is required"); return; }
-    if (!iso) { setErr("Please select a valid deadline"); return; }
-    try {
-      const exam = await api.createExam({ title, due_at: iso });
-      setMsg(`Exam "${exam.title}" created (ID ${exam.id}). Select it below to upload a solution.`);
-      setTitle("");
-      setDueAt("");
-      onCreate();
-    } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to create exam");
-    }
-  };
-
-  return (
-    <div className="card" style={{ maxWidth: 480 }}>
-      <h2>Create new exam</h2>
-      <div className="form-group">
-        <label>Title</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Midterm 1" />
-      </div>
-      <div className="form-group">
-        <label>Deadline (local time)</label>
-        <input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
-      </div>
-      <button className="btn-primary" onClick={submit}>Create exam</button>
-      {msg && <div className="banner success">{msg}</div>}
-      {err && <div className="banner error">{err}</div>}
-    </div>
-  );
-}
-
-// ── Root Professor component ───────────────────────────────────────────────────
+// ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function Professor() {
-  const [activeTab, setActiveTab] = useState("exams");
-  const [myExams, setMyExams] = useState([]);
-  const [selectedExam, setSelectedExam] = useState(null);
+  const [tab, setTab]           = useState("exams");
+  const [exams, setExams]       = useState([]);
+  const [selected, setSelected] = useState(null);
 
   const loadExams = useCallback(async () => {
-    try {
-      const list = await api.getMyExams();
-      setMyExams(list);
-    } catch (e) {
-      console.error("Failed to load exams:", e);
-    }
+    try { setExams(await api.getMyExams()); } catch {}
   }, []);
 
   useEffect(() => { loadExams(); }, [loadExams]);
 
-  const handleSelectExam = (exam) => {
-    setSelectedExam(exam);
-    setActiveTab("exams");
-  };
-
-  if (selectedExam) {
-    const liveExam = myExams.find((e) => e.id === selectedExam.id) || selectedExam;
-    return (
-      <div className="container">
-        <ExamDetail
-          exam={liveExam}
-          onBack={() => setSelectedExam(null)}
-          onRefresh={loadExams}
-        />
-      </div>
-    );
+  if (selected) {
+    const live = exams.find(e => e.id === selected.id) || selected;
+    return <ExamDetail exam={live} onBack={() => setSelected(null)} onRefresh={loadExams} />;
   }
 
   return (
-    <div className="container">
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "exams" ? "active" : ""}`}
-          onClick={() => setActiveTab("exams")}
-        >
-          My Exams ({myExams.length})
+    <div className="container content">
+      <div className="tabs-bar">
+        <button className={`tab-btn ${tab === "exams" ? "active" : ""}`} onClick={() => setTab("exams")}>
+          My Exams
+          <span className="tab-badge">{exams.length}</span>
         </button>
-        <button
-          className={`tab ${activeTab === "create" ? "active" : ""}`}
-          onClick={() => setActiveTab("create")}
-        >
+        <button className={`tab-btn ${tab === "create" ? "active" : ""}`} onClick={() => setTab("create")}>
           + New Exam
         </button>
       </div>
 
-      {activeTab === "exams" && (
-        <div>
-          {myExams.length === 0 ? (
-            <div className="empty-state">
-              <p>You haven't created any exams yet.</p>
-              <button className="btn-primary" onClick={() => setActiveTab("create")}>
-                Create your first exam
-              </button>
+      {tab === "exams" && (
+        exams.length === 0
+          ? <div className="empty">
+              <div className="empty-icon">🎓</div>
+              <div className="empty-title">No exams yet</div>
+              <div className="empty-desc">Create your first exam and upload a solution PDF to get started.</div>
+              <button className="btn btn-primary" onClick={() => setTab("create")}>Create exam</button>
             </div>
-          ) : (
-            <div className="exam-grid">
-              {myExams.map((exam) => (
-                <ExamCard
-                  key={exam.id}
-                  exam={exam}
-                  onClick={() => handleSelectExam(exam)}
-                />
+          : <div className="exams-grid">
+              {exams.map(e => (
+                <ExamCard key={e.id} exam={e} onClick={() => setSelected(e)} />
               ))}
             </div>
-          )}
-        </div>
       )}
 
-      {activeTab === "create" && (
-        <CreateExam
-          onCreate={() => {
-            loadExams();
-            setActiveTab("exams");
-          }}
-        />
+      {tab === "create" && (
+        <CreateExam onCreate={() => { loadExams(); setTab("exams"); }} />
       )}
     </div>
   );

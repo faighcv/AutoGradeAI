@@ -5,10 +5,8 @@ const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true); // true while verifying session
+  const [checking, setChecking] = useState(true);
 
-  // On mount: verify the cookie is still valid against the server.
-  // If not, clear any stale localStorage and stay logged out.
   useEffect(() => {
     api.http
       .get("/auth/me")
@@ -23,19 +21,15 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      // ignore backend errors — still clear local state
-    }
+    try { await api.logout(); } catch {}
     setUser(null);
   };
 
-  // Don't render anything until we know whether the session is valid
   if (checking) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "#9aa4b2" }}>
-        Loading…
+      <div className="loading-screen">
+        <div className="spinner" />
+        <span className="loading-text">Checking session…</span>
       </div>
     );
   }

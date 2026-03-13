@@ -28,6 +28,7 @@ export default function Login() {
   };
 
   return (
+    <div className="container" style={{ maxWidth: 440 }}>
     <div className="card">
       <h1>Welcome back</h1>
       <p className="muted">Sign in to continue.</p>
@@ -75,6 +76,7 @@ export default function Login() {
       <p className="muted">
         No account? <Link to="/register">Create one</Link>
       </p>
+    </div>
     </div>
   );
 }

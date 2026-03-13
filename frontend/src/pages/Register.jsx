@@ -23,6 +23,7 @@ export default function Register() {
   };
 
   return (
+    <div className="container" style={{ maxWidth: 440 }}>
     <div className="card">
       <h1>Create an account</h1>
       <form onSubmit={onSubmit} className="form">
@@ -39,6 +40,7 @@ export default function Register() {
         <button className="primary">Register</button>
       </form>
       <p className="muted">Already have an account? <Link to="/login">Log in</Link></p>
+    </div>
     </div>
   );
 }

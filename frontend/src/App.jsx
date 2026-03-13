@@ -14,15 +14,13 @@ export default function App() {
   return (
     <AuthProvider>
       <NavBar />
-      <div className="container">
-        <Routes>
+      <Routes>
           <Route path="/" element={<Navigate to="/app" replace />} />
           <Route path="/app" element={<PrivateOutlet />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/app" replace />} />
-        </Routes>
-      </div>
+      </Routes>
     </AuthProvider>
   );
 }

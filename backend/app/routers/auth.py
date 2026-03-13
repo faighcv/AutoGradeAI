@@ -5,20 +5,21 @@ import uuid
 
 from .. import schemas, models
 from ..auth.hashing import hash_password, verify_password
-from ..deps import get_db
+from ..deps import get_db, get_current_user
 from ..config import settings
 
 router = APIRouter()
+
 
 @router.post("/register")
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if user.role not in {"PROF", "STUDENT"}:
         raise HTTPException(status_code=400, detail="role must be PROF or STUDENT")
-
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="email already registered")
-
-    u = models.User(email=user.email, hashed_password=hash_password(user.password), role=user.role)
+    u = models.User(
+        email=user.email, hashed_password=hash_password(user.password), role=user.role
+    )
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -27,9 +28,6 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(data: dict, response: Response, db: Session = Depends(get_db)):
-    """
-    Accepts JSON body like: { "email": "...", "password": "...", "role": "PROF" }
-    """
     email = data.get("email")
     password = data.get("password")
     role = data.get("role")
@@ -41,7 +39,6 @@ def login(data: dict, response: Response, db: Session = Depends(get_db)):
     if not u or not verify_password(password, u.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    # Optional: enforce role correctness
     if role and role != u.role:
         raise HTTPException(status_code=401, detail=f"Role mismatch. This account is a {u.role}")
 
@@ -59,7 +56,6 @@ def login(data: dict, response: Response, db: Session = Depends(get_db)):
         max_age=settings.SESSION_EXPIRE_HOURS * 3600,
         path="/",
     )
-
     return {"id": u.id, "email": u.email, "role": u.role}
 
 
@@ -67,3 +63,9 @@ def login(data: dict, response: Response, db: Session = Depends(get_db)):
 def logout(response: Response):
     response.delete_cookie("ag_session", path="/")
     return {"ok": True}
+
+
+@router.get("/me")
+def me(user=Depends(get_current_user)):
+    """Verify the session cookie and return current user. 401 if invalid."""
+    return {"id": user.id, "email": user.email, "role": user.role}

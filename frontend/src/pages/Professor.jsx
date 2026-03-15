@@ -433,6 +433,18 @@ export default function Professor() {
 
   return (
     <div className="container content">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 36 }}>
+        <div>
+          <h1 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 6 }}>Professor Dashboard</h1>
+          <p style={{ color: "var(--muted)", fontSize: "1rem" }}>
+            {exams.length === 0
+              ? "No exams yet — create your first one below."
+              : `${exams.length} exam${exams.length !== 1 ? "s" : ""} · ${exams.filter(e => new Date(e.due_at) >= new Date()).length} open`}
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setTab("create")}>+ New Exam</button>
+      </div>
+
       <div className="tabs-bar">
         <button className={`tab-btn ${tab === "exams" ? "active" : ""}`} onClick={() => setTab("exams")}>
           My Exams

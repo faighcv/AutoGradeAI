@@ -1,5 +1,192 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 
+/* ── Demo data ─────────────────────────────────────────────── */
+const DEMO_QUESTIONS = [
+  {
+    id: 1,
+    label: "Q1 — Kinematics",
+    text: "A car accelerates from 0 to 60 km/h in 8 seconds. Calculate the acceleration in m/s².",
+    points: 10,
+  },
+  {
+    id: 2,
+    label: "Q2 — Energy conservation",
+    text: "A 2 kg ball is dropped from 10 m. What is its velocity just before impact? Ignore air resistance.",
+    points: 10,
+  },
+  {
+    id: 3,
+    label: "Q3 — Conservation of momentum",
+    text: "A 3 kg object moving at 4 m/s collides and sticks to a 5 kg object at rest. Find the final velocity.",
+    points: 10,
+  },
+];
+
+const DEMO_RESULTS = [
+  {
+    id: 1,
+    score: 10,
+    rationale:
+      "Student correctly applied a = Δv/Δt = (16.67 − 0) / 8 = 2.08 m/s². All working shown clearly.",
+    strengths: ["Correct formula", "Unit conversion from km/h to m/s", "Full working shown"],
+    missing: [],
+  },
+  {
+    id: 2,
+    score: 8,
+    rationale:
+      "Correct use of v² = 2gh → v ≈ 14.0 m/s. Student omitted stating the unit in the final answer.",
+    strengths: ["Correct equation selected", "Substitution correct", "Numerical answer correct"],
+    missing: ["Final unit (m/s) not stated"],
+  },
+  {
+    id: 3,
+    score: 7,
+    rationale:
+      "Momentum conservation applied correctly: (3×4) = 8v → v = 1.5 m/s. However, student incorrectly classified this as an elastic collision.",
+    strengths: ["Correct momentum equation", "Arithmetic correct"],
+    missing: ["Incorrectly identified as elastic collision", "No check of KE loss"],
+  },
+];
+
+const GRADING_STEPS = [
+  "Reading student PDF…",
+  "Detecting questions…",
+  "Grading Q1 — Kinematics…",
+  "Grading Q2 — Energy conservation…",
+  "Grading Q3 — Momentum…",
+  "Finalising results…",
+];
+
+function Demo() {
+  const [phase, setPhase] = useState("idle"); // idle | grading | done
+  const [stepIdx, setStepIdx] = useState(0);
+  const [visibleResults, setVisibleResults] = useState([]);
+
+  function startGrading() {
+    setPhase("grading");
+    setStepIdx(0);
+    setVisibleResults([]);
+  }
+
+  // Advance through grading steps
+  useEffect(() => {
+    if (phase !== "grading") return;
+    if (stepIdx < GRADING_STEPS.length - 1) {
+      const t = setTimeout(() => setStepIdx((i) => i + 1), 480);
+      return () => clearTimeout(t);
+    } else {
+      const t = setTimeout(() => {
+        setPhase("done");
+        // Reveal results one by one
+        DEMO_RESULTS.forEach((_, i) => {
+          setTimeout(() => setVisibleResults((v) => [...v, i]), i * 300);
+        });
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, stepIdx]);
+
+  const total = DEMO_RESULTS.reduce((s, r) => s + r.score, 0);
+  const maxTotal = DEMO_QUESTIONS.reduce((s, q) => s + q.points, 0);
+
+  return (
+    <div className="demo-shell">
+      {/* Left: exam info */}
+      <div className="demo-left">
+        <div className="demo-file-badge">📄 student_chen.pdf</div>
+        <p className="demo-exam-title">Physics Midterm — Mechanics</p>
+        <div className="demo-q-list">
+          {DEMO_QUESTIONS.map((q) => (
+            <div key={q.id} className="demo-q-item">
+              <span className="demo-q-label">{q.label}</span>
+              <span className="demo-q-pts">{q.points} pts</span>
+            </div>
+          ))}
+        </div>
+        <div className="demo-q-item demo-q-total">
+          <span>Total</span>
+          <span className="demo-q-pts">30 pts</span>
+        </div>
+
+        {phase === "idle" && (
+          <button className="lp-btn-primary demo-grade-btn" onClick={startGrading}>
+            Grade this exam
+          </button>
+        )}
+        {phase === "grading" && (
+          <div className="demo-progress">
+            <div className="demo-spinner" />
+            <span className="demo-step-label">{GRADING_STEPS[stepIdx]}</span>
+          </div>
+        )}
+        {phase === "done" && (
+          <div className="demo-summary">
+            <span className="demo-total-score">{total} / {maxTotal}</span>
+            <span className="demo-total-label">Total score</span>
+            <button
+              className="demo-reset-btn"
+              onClick={() => { setPhase("idle"); setVisibleResults([]); }}
+            >
+              Reset demo
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Right: results */}
+      <div className="demo-right">
+        {phase === "idle" && (
+          <div className="demo-placeholder">
+            <div className="demo-placeholder-icon">→</div>
+            <p>Click "Grade this exam" to see AutoGradeAI in action</p>
+          </div>
+        )}
+        {phase === "grading" && (
+          <div className="demo-placeholder demo-placeholder-active">
+            <div className="demo-bar-wrap">
+              {GRADING_STEPS.map((s, i) => (
+                <div
+                  key={i}
+                  className={`demo-bar-step ${i <= stepIdx ? "demo-bar-done" : ""}`}
+                />
+              ))}
+            </div>
+            <p>Grading in progress…</p>
+          </div>
+        )}
+        {phase === "done" && (
+          <div className="demo-results">
+            {DEMO_RESULTS.map((r, i) => (
+              <div
+                key={r.id}
+                className={`demo-result-card ${visibleResults.includes(i) ? "demo-result-visible" : ""}`}
+              >
+                <div className="demo-result-header">
+                  <span className="demo-result-label">{DEMO_QUESTIONS[i].label}</span>
+                  <span className={`demo-result-score ${r.score === DEMO_QUESTIONS[i].points ? "score-full" : "score-partial"}`}>
+                    {r.score} / {DEMO_QUESTIONS[i].points}
+                  </span>
+                </div>
+                <p className="demo-result-rationale">{r.rationale}</p>
+                {r.missing.length > 0 && (
+                  <div className="demo-result-missing">
+                    {r.missing.map((m, j) => (
+                      <span key={j} className="demo-missing-tag">− {m}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Page ──────────────────────────────────────────────────── */
 export default function Landing() {
   return (
     <div className="lp-page">
@@ -87,6 +274,17 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Interactive Demo ─────────────────────────────── */}
+      <section className="lp-section lp-section-alt">
+        <div className="lp-section-inner">
+          <h2 className="lp-h2">Try it — no sign-up needed</h2>
+          <p className="lp-section-sub">
+            See exactly what a professor gets after a student submits their exam PDF.
+          </p>
+          <Demo />
+        </div>
+      </section>
+
       {/* ── How it works ─────────────────────────────────── */}
       <section className="lp-section">
         <div className="lp-section-inner">
@@ -129,7 +327,6 @@ export default function Landing() {
           <h2 className="lp-h2">Built for professors and students</h2>
           <p className="lp-section-sub">Each role gets exactly what they need.</p>
           <div className="lp-two-col">
-
             <div className="lp-col-card">
               <div className="lp-col-icon lp-icon-prof">P</div>
               <h3 className="lp-col-title">Professors</h3>
@@ -142,7 +339,6 @@ export default function Landing() {
                 <li>Extend deadlines per student</li>
               </ul>
             </div>
-
             <div className="lp-col-card">
               <div className="lp-col-icon lp-icon-student">S</div>
               <h3 className="lp-col-title">Students</h3>
@@ -155,7 +351,6 @@ export default function Landing() {
                 <li>View your full submission history</li>
               </ul>
             </div>
-
           </div>
         </div>
       </section>
@@ -193,9 +388,7 @@ export default function Landing() {
       <section className="lp-cta-section">
         <div className="lp-cta-inner">
           <h2 className="lp-cta-h2">Ready to stop grading by hand?</h2>
-          <p className="lp-cta-sub">
-            Set up your first exam in under two minutes.
-          </p>
+          <p className="lp-cta-sub">Set up your first exam in under two minutes.</p>
           <Link to="/register" className="lp-btn-primary lp-btn-lg">
             Create your free account
           </Link>

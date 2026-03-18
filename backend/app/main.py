@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,13 +10,16 @@ from .routers import student as student_router
 
 app = FastAPI(title="AutoGradeAI (Cookie Sessions)")
 
-# ✅ Correct CORS setup for cookies
+# Build CORS origins: always include localhost for dev,
+# plus any production frontend URL set via FRONTEND_URL env var.
+_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+_frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+if _frontend_url:
+    _origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173"
-    ],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

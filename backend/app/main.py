@@ -1,6 +1,4 @@
 import os
-import signal
-import threading
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -15,26 +13,6 @@ from .routers import student as student_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def _sigterm_handler(sig, frame):
-    logger.info(f"SIGNAL RECEIVED: {sig} — process is shutting down")
-
-signal.signal(signal.SIGTERM, _sigterm_handler)
-signal.signal(signal.SIGABRT, _sigterm_handler)
-
-def _heartbeat():
-    import time
-    count = 0
-    while True:
-        time.sleep(5)
-        count += 1
-        try:
-            with open("/proc/self/status") as f:
-                mem = next((l for l in f if "VmRSS" in l), "").strip()
-        except Exception:
-            mem = "unknown"
-        logger.info(f"HEARTBEAT t+{count*5}s | {mem}")
-
-threading.Thread(target=_heartbeat, daemon=True).start()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -3,16 +3,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from .config import settings
 
-# Normalize Railway's postgresql:// to use psycopg2 explicitly
+# Normalize to pg8000 (pure Python driver — no native C, no segfaults)
 _db_url = settings.DATABASE_URL
-if _db_url.startswith("postgresql://"):
-    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+if _db_url.startswith("postgresql://") or _db_url.startswith("postgresql+psycopg2://"):
+    _db_url = _db_url.split("://", 1)[1]
+    _db_url = "postgresql+pg8000://" + _db_url
 
 connect_args = {}
-
-if _db_url.startswith("postgresql+psycopg://"):
-    connect_args["prepare_threshold"] = None
-
 if _db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 

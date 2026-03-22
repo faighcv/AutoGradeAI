@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from .config import settings
 
 # Normalize Railway's postgresql:// to use psycopg2 explicitly
@@ -19,8 +20,7 @@ engine = create_engine(
     _db_url,
     echo=False,
     future=True,
-    pool_pre_ping=True,
-    pool_recycle=300,
+    poolclass=NullPool,
     connect_args=connect_args,
 )
 

@@ -10,11 +10,13 @@ from .routers import student as student_router
 
 app = FastAPI(title="AutoGradeAI (Cookie Sessions)")
 
-# Build CORS origins: always include localhost for dev,
-# plus any production frontend URL set via FRONTEND_URL env var.
-_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "https://auto-grade-ai.vercel.app",
+]
 _frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
-if _frontend_url:
+if _frontend_url and _frontend_url not in _origins:
     _origins.append(_frontend_url)
 
 app.add_middleware(

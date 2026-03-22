@@ -51,8 +51,8 @@ def login(data: dict, response: Response, db: Session = Depends(get_db)):
         key="ag_session",
         value=sid,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite="none" if settings.PRODUCTION else "lax",
+        secure=settings.PRODUCTION,
         max_age=settings.SESSION_EXPIRE_HOURS * 3600,
         path="/",
     )
@@ -61,7 +61,12 @@ def login(data: dict, response: Response, db: Session = Depends(get_db)):
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie("ag_session", path="/")
+    response.delete_cookie(
+        "ag_session",
+        path="/",
+        samesite="none" if settings.PRODUCTION else "lax",
+        secure=settings.PRODUCTION,
+    )
     return {"ok": True}
 
 

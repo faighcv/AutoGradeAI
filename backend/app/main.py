@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,13 @@ from .routers import student as student_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Keepalive thread — prevents process from exiting when idle
+def _keepalive():
+    import time
+    while True:
+        time.sleep(30)
+
+threading.Thread(target=_keepalive, daemon=True).start()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

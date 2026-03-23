@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+gunicorn
 passlib
 argon2-cffi
 sqlalchemy>=2.0

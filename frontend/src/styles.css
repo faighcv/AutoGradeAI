@@ -715,6 +715,85 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 }
 .lp-cta-sub { font-size: 16px; color: var(--text2); margin: 0; }
 
+/* ── Plans ────────────────────────────────────── */
+.lp-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 48px;
+  align-items: start;
+}
+.lp-plan-card {
+  position: relative;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.lp-plan-featured {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary), 0 8px 32px rgba(29,78,216,0.18);
+}
+.lp-plan-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 14px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.lp-plan-top { display: flex; flex-direction: column; gap: 8px; }
+.lp-plan-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+.lp-plan-featured .lp-plan-name { color: var(--primary-light); }
+.lp-plan-price-row { display: flex; align-items: baseline; gap: 4px; }
+.lp-plan-price { font-size: 36px; font-weight: 800; color: var(--text); line-height: 1; }
+.lp-plan-period { font-size: 14px; color: var(--muted); }
+.lp-plan-desc { font-size: 13px; color: var(--text2); margin: 0; line-height: 1.5; }
+.lp-plan-divider { height: 1px; background: var(--border); }
+.lp-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.lp-plan-features li { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+.lp-feat-check { color: var(--success); font-size: 13px; flex-shrink: 0; }
+.lp-feat-muted  { color: var(--border2); font-size: 13px; flex-shrink: 0; }
+.lp-plan-features li:has(.lp-feat-muted) { color: var(--muted); }
+.lp-plan-btn {
+  display: block;
+  text-align: center;
+  padding: 11px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.lp-plan-btn-outline { border: 1px solid var(--border2); color: var(--text2); background: transparent; }
+.lp-plan-btn-outline:hover { border-color: var(--primary-light); color: var(--primary-light); text-decoration: none; }
+.lp-plan-btn-primary { background: var(--primary); color: #fff; border: 1px solid transparent; }
+.lp-plan-btn-primary:hover { background: var(--primary-light); text-decoration: none; }
+
 /* ── Footer ───────────────────────────────────── */
 .lp-footer {
   border-top: 1px solid var(--border);
@@ -948,6 +1027,7 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   .lp-step-arrow { display: none; }
   .lp-two-col { grid-template-columns: 1fr; }
   .lp-diff-grid { grid-template-columns: 1fr; }
+  .lp-plans-grid { grid-template-columns: 1fr; }
   .lp-section-inner { padding: 0 24px; }
   .lp-nav-inner { padding: 0 24px; }
   .lp-footer-inner { padding: 0 24px; }

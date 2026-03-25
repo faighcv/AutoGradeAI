@@ -384,6 +384,83 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Plans ────────────────────────────────────────── */}
+      <section className="lp-section lp-section-alt">
+        <div className="lp-section-inner">
+          <h2 className="lp-h2">Simple, honest pricing</h2>
+          <p className="lp-section-sub">Start free. Upgrade when your class grows.</p>
+          <div className="lp-plans-grid">
+
+            {/* Free */}
+            <div className="lp-plan-card">
+              <div className="lp-plan-top">
+                <p className="lp-plan-name">Free</p>
+                <div className="lp-plan-price-row">
+                  <span className="lp-plan-price">$0</span>
+                  <span className="lp-plan-period">/ month</span>
+                </div>
+                <p className="lp-plan-desc">Perfect for trying it out or a single small exam.</p>
+              </div>
+              <div className="lp-plan-divider" />
+              <ul className="lp-plan-features">
+                <li><span className="lp-feat-check">✓</span> 10 graded submissions / month</li>
+                <li><span className="lp-feat-check">✓</span> 1 active exam at a time</li>
+                <li><span className="lp-feat-check">✓</span> Full AI grading &amp; rationale</li>
+                <li><span className="lp-feat-check">✓</span> Question-by-question breakdown</li>
+                <li><span className="lp-feat-muted">–</span> CSV export</li>
+                <li><span className="lp-feat-muted">–</span> Academic integrity detection</li>
+              </ul>
+              <Link to="/register" className="lp-plan-btn lp-plan-btn-outline">Get started free</Link>
+            </div>
+
+            {/* Pro */}
+            <div className="lp-plan-card lp-plan-featured">
+              <div className="lp-plan-badge">Most popular</div>
+              <div className="lp-plan-top">
+                <p className="lp-plan-name">Pro</p>
+                <div className="lp-plan-price-row">
+                  <span className="lp-plan-price">$19</span>
+                  <span className="lp-plan-period">/ month</span>
+                </div>
+                <p className="lp-plan-desc">For professors who grade regularly and want the full experience.</p>
+              </div>
+              <div className="lp-plan-divider" />
+              <ul className="lp-plan-features">
+                <li><span className="lp-feat-check">✓</span> 300 graded submissions / month</li>
+                <li><span className="lp-feat-check">✓</span> Unlimited active exams</li>
+                <li><span className="lp-feat-check">✓</span> Full AI grading &amp; rationale</li>
+                <li><span className="lp-feat-check">✓</span> Question-by-question breakdown</li>
+                <li><span className="lp-feat-check">✓</span> CSV export</li>
+                <li><span className="lp-feat-check">✓</span> Academic integrity detection</li>
+              </ul>
+              <Link to="/register" className="lp-plan-btn lp-plan-btn-primary">Start free trial</Link>
+            </div>
+
+            {/* Enterprise */}
+            <div className="lp-plan-card">
+              <div className="lp-plan-top">
+                <p className="lp-plan-name">Enterprise</p>
+                <div className="lp-plan-price-row">
+                  <span className="lp-plan-price">Custom</span>
+                </div>
+                <p className="lp-plan-desc">For departments, universities, or high-volume use.</p>
+              </div>
+              <div className="lp-plan-divider" />
+              <ul className="lp-plan-features">
+                <li><span className="lp-feat-check">✓</span> Unlimited submissions</li>
+                <li><span className="lp-feat-check">✓</span> Multiple professor accounts</li>
+                <li><span className="lp-feat-check">✓</span> Everything in Pro</li>
+                <li><span className="lp-feat-check">✓</span> LMS integration support</li>
+                <li><span className="lp-feat-check">✓</span> SSO &amp; admin dashboard</li>
+                <li><span className="lp-feat-check">✓</span> Dedicated support &amp; onboarding</li>
+              </ul>
+              <a href="mailto:hello@autogradeai.com" className="lp-plan-btn lp-plan-btn-outline">Contact us</a>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ──────────────────────────────────────────── */}
       <section className="lp-cta-section">
         <div className="lp-cta-inner">

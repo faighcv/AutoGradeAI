@@ -12,8 +12,10 @@ if _db_url.startswith("postgresql://") or _db_url.startswith("postgresql+psycopg
 
 connect_args = {}
 if _db_url.startswith("postgresql+pg8000://"):
-    # Supabase requires SSL
-    ssl_context = ssl.create_default_context()
+    # Supabase pooler requires SSL but certificate verification causes issues
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
     connect_args["ssl_context"] = ssl_context
 elif _db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False

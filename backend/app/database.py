@@ -1,23 +1,24 @@
-import ssl
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from .config import settings
 
-# Normalize to pg8000 (pure Python driver — no native C, no segfaults)
+# Normalize to psycopg3 (supports async, clean SSL via sslmode=require)
 _db_url = settings.DATABASE_URL
-if _db_url.startswith("postgresql://") or _db_url.startswith("postgresql+psycopg2://"):
-    _db_url = _db_url.split("://", 1)[1]
-    _db_url = "postgresql+pg8000://" + _db_url
+if _db_url.startswith("postgresql+psycopg2://"):
+    _db_url = _db_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+elif _db_url.startswith("postgresql+pg8000://"):
+    _db_url = _db_url.replace("postgresql+pg8000://", "postgresql+psycopg://", 1)
+elif _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+# Append sslmode=require for Supabase (pooler and direct)
+if _db_url.startswith("postgresql+psycopg://"):
+    sep = "&" if "?" in _db_url else "?"
+    _db_url = _db_url + sep + "sslmode=require"
 
 connect_args = {}
-if _db_url.startswith("postgresql+pg8000://"):
-    # Supabase pooler requires SSL but certificate verification causes issues
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    connect_args["ssl_context"] = ssl_context
-elif _db_url.startswith("sqlite"):
+if _db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
 engine = create_engine(

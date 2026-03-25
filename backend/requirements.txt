@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 sqlalchemy>=2.0
-pg8000
+psycopg[binary]
 pydantic[email]>=2
 python-multipart
 python-dotenv

@@ -1,6 +1,4 @@
 import os
-import sys
-import signal
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -16,25 +14,13 @@ from .routers import student as student_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Signal handlers — log signals before exiting so we know the cause
-def _sig_handler(signum, frame):
-    print(f"FATAL: received signal {signum} (SIGTERM=15, SIGINT=2, SIGHUP=1) — exiting", flush=True)
-    sys.exit(0)
-
-signal.signal(signal.SIGTERM, _sig_handler)
-signal.signal(signal.SIGHUP, _sig_handler)
-
-# Heartbeat — proves process is alive; also detects OOM (no more logs after kill)
-def _heartbeat():
+# Keepalive thread — prevents process from exiting when idle
+def _keepalive():
     import time
-    i = 0
     while True:
-        time.sleep(10)
-        i += 1
-        print(f"HEARTBEAT {i*10}s — pid={os.getpid()} alive", flush=True)
+        time.sleep(30)
 
-threading.Thread(target=_heartbeat, daemon=True).start()
-print(f"STARTUP: main.py loaded, heartbeat started, PORT={os.environ.get('PORT', 'NOT_SET')}", flush=True)
+threading.Thread(target=_keepalive, daemon=True).start()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -117,6 +117,7 @@ def list_my_exams(prof=Depends(get_prof), db: Session = Depends(get_db)):
                 "id": e.id,
                 "title": e.title,
                 "due_at": e.due_at,
+                "enrollment_code": e.enrollment_code,
                 "submission_count": sub_count,
                 "graded_count": graded_count,
                 "has_solution": has_solution,

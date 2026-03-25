@@ -393,6 +393,12 @@ function ExamCard({ exam, onClick }) {
       <div className={`exam-card-solution ${exam.has_solution ? "solution-ok" : "solution-miss"}`}>
         {exam.has_solution ? "✓ Solution uploaded" : "⚠ No solution PDF yet"}
       </div>
+      {exam.enrollment_code && (
+        <div className="exam-code-row">
+          <span className="exam-code-label">Join code</span>
+          <span className="exam-code-val">{exam.enrollment_code}</span>
+        </div>
+      )}
       <div className="exam-card-stats">
         <div className="exam-stat">
           <div className="exam-stat-val">{exam.submission_count}</div>

@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import engine
-from .models import Base
+from sqlalchemy import text
+from .database import engine, SessionLocal
+from .models import Base, Exam, _gen_code
 from .routers import auth as auth_router
 from .routers import professor as professor_router
 from .routers import student as student_router
@@ -27,6 +28,22 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Creating database tables...")
         Base.metadata.create_all(bind=engine)
+        # Add enrollment_code column to existing exams table if missing
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE exams ADD COLUMN IF NOT EXISTS enrollment_code VARCHAR(8)"
+            ))
+            conn.commit()
+        # Generate codes for exams that don't have one yet
+        db = SessionLocal()
+        try:
+            exams = db.query(Exam).filter(Exam.enrollment_code == None).all()
+            for exam in exams:
+                exam.enrollment_code = _gen_code()
+            if exams:
+                db.commit()
+        finally:
+            db.close()
         logger.info("Database tables ready.")
     except Exception as e:
         logger.error(f"DB init failed: {e}")

@@ -1,6 +1,47 @@
 import { useEffect, useState, useCallback } from "react";
 import * as api from "../api";
 
+function JoinExam({ onJoined }) {
+  const [code, setCode] = useState("");
+  const [err, setErr]   = useState("");
+  const [ok, setOk]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr(""); setOk("");
+    if (!code.trim()) return;
+    setLoading(true);
+    try {
+      const exam = await api.joinExam(code.trim());
+      setOk(`Joined "${exam.title}"!`);
+      setCode("");
+      onJoined();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Invalid code");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="join-exam-bar">
+      <form onSubmit={submit} className="join-exam-form">
+        <input
+          className="form-input join-exam-input"
+          placeholder="Enter exam code (e.g. AB12CD34)"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          maxLength={8}
+        />
+        <button className="btn btn-primary" disabled={loading || !code.trim()}>
+          {loading ? "Joining…" : "Join exam"}
+        </button>
+      </form>
+      {err && <div className="alert alert-error" style={{ marginTop: 8 }}>{err}</div>}
+      {ok  && <div className="alert alert-success" style={{ marginTop: 8 }}>{ok}</div>}
+    </div>
+  );
+}
+
 // ── Grade breakdown ───────────────────────────────────────────────────────────
 
 function Breakdown({ breakdown }) {
@@ -117,6 +158,7 @@ export default function Student() {
 
   return (
     <div className="container content">
+      <JoinExam onJoined={loadOpen} />
       <div className="tabs-bar">
         <button className={`tab-btn ${tab === "submit" ? "active" : ""}`} onClick={() => setTab("submit")}>
           Submit Exam

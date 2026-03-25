@@ -23,13 +23,44 @@ def require_student(user=Depends(get_current_user)):
     return user
 
 
+# ── Join exam via enrollment code ─────────────────────────────────────────────
+
+@router.post("/exams/join")
+def join_exam(payload: dict, user=Depends(require_student), db: Session = Depends(get_db)):
+    code = payload.get("code", "").strip().upper()
+    if not code:
+        raise HTTPException(400, "code required")
+    exam = db.query(models.Exam).filter(models.Exam.enrollment_code == code).first()
+    if not exam:
+        raise HTTPException(404, "Invalid code — check with your teacher")
+    if datetime.utcnow() > exam.due_at:
+        raise HTTPException(400, "This exam's deadline has already passed")
+    existing = db.query(models.ExamEnrollment).filter(
+        models.ExamEnrollment.exam_id == exam.id,
+        models.ExamEnrollment.student_id == user.id,
+    ).first()
+    if not existing:
+        db.add(models.ExamEnrollment(exam_id=exam.id, student_id=user.id))
+        db.commit()
+    return {"id": exam.id, "title": exam.title, "due_at": exam.due_at}
+
+
 # ── List open exams ───────────────────────────────────────────────────────────
 
 @router.get("/exams/open")
 def list_open_exams(user=Depends(require_student), db: Session = Depends(get_db)):
-    """Exams that are still accepting submissions."""
+    """Only exams the student is enrolled in."""
     now = datetime.utcnow()
-    exams = db.query(models.Exam).filter(models.Exam.due_at > now).all()
+    enrolled_ids = (
+        db.query(models.ExamEnrollment.exam_id)
+        .filter(models.ExamEnrollment.student_id == user.id)
+        .subquery()
+    )
+    exams = (
+        db.query(models.Exam)
+        .filter(models.Exam.id.in_(enrolled_ids), models.Exam.due_at > now)
+        .all()
+    )
     return [{"id": e.id, "title": e.title, "due_at": e.due_at} for e in exams]
 
 
@@ -98,6 +129,14 @@ def submit_pdf(
     img_dir = UPLOAD_DIR / f"exam_{exam_id}_student_{user.id}_imgs"
     student_imgs = pdf_to_pngs(str(dest), str(img_dir))
 
+    # ── Auto-enroll if not already ────────────────────────────────────────────
+    if not db.query(models.ExamEnrollment).filter(
+        models.ExamEnrollment.exam_id == exam_id,
+        models.ExamEnrollment.student_id == user.id,
+    ).first():
+        db.add(models.ExamEnrollment(exam_id=exam_id, student_id=user.id))
+        db.commit()
+
     # ── Create Submission record ──────────────────────────────────────────────
     sub = models.Submission(exam_id=exam_id, student_id=user.id, status="PENDING")
     db.add(sub)
@@ -112,7 +151,7 @@ def submit_pdf(
     )
     if not sdoc:
         raise HTTPException(
-            status_code=400, detail="Professor has not uploaded a solution PDF yet"
+            status_code=400, detail="Teacher has not uploaded a solution PDF yet"
         )
 
     try:

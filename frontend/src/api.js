@@ -94,3 +94,8 @@ export async function getMySubmissions() {
   const { data } = await http.get("/student/submissions");
   return data;
 }
+
+export async function joinExam(code) {
+  const { data } = await http.post("/student/exams/join", { code });
+  return data;
+}

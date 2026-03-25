@@ -21,6 +21,7 @@ class ExamOut(BaseModel):
     id: int
     title: str
     due_at: datetime
+    enrollment_code: str | None = None
     class Config:
         from_attributes = True
 

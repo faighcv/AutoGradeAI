@@ -205,14 +205,14 @@ export default function Landing() {
       {/* ── Hero ────────────────────────────────────────── */}
       <section className="lp-hero">
         <div className="lp-hero-inner">
-          <p className="lp-eyebrow">For professors who grade PDF exams</p>
+          <p className="lp-eyebrow">For teachers &amp; instructors who grade PDF exams</p>
           <h1 className="lp-h1">
             Grade 30 exams in<br />
             minutes, not hours
           </h1>
           <p className="lp-sub">
             Upload your solution PDF. Students submit their answers.
-            GPT-4o reads every page and scores each question — with
+            AI reads every page and scores each question — with
             point breakdowns and written rationale.
           </p>
           <div className="lp-hero-actions">
@@ -228,7 +228,7 @@ export default function Landing() {
             <span className="lp-dot" />
             <span className="lp-dot" />
             <span className="lp-dot" />
-            <span className="lp-preview-label">AutoGradeAI — Professor Dashboard</span>
+            <span className="lp-preview-label">AutoGradeAI — Teacher Dashboard</span>
           </div>
           <div className="lp-preview-body">
             <div className="lp-mock-stat-row">
@@ -279,7 +279,7 @@ export default function Landing() {
         <div className="lp-section-inner">
           <h2 className="lp-h2">Try it — no sign-up needed</h2>
           <p className="lp-section-sub">
-            See exactly what a professor gets after a student submits their exam PDF.
+            See exactly what a teacher gets after a student submits their exam PDF.
           </p>
           <Demo />
         </div>
@@ -293,10 +293,10 @@ export default function Landing() {
           <div className="lp-steps">
             <div className="lp-step">
               <div className="lp-step-num">1</div>
-              <h3 className="lp-step-title">Professor uploads solution PDF</h3>
+              <h3 className="lp-step-title">Teacher uploads solution PDF</h3>
               <p className="lp-step-body">
                 Upload your answer key as a PDF. AutoGradeAI reads it with
-                GPT-4o Vision to detect each question and its correct answer.
+                AI to detect each question and its correct answer.
               </p>
             </div>
             <div className="lp-step-arrow">→</div>
@@ -311,7 +311,7 @@ export default function Landing() {
             <div className="lp-step-arrow">→</div>
             <div className="lp-step">
               <div className="lp-step-num">3</div>
-              <h3 className="lp-step-title">GPT-4o grades every question</h3>
+              <h3 className="lp-step-title">AI grades every question</h3>
               <p className="lp-step-body">
                 Each question gets a numeric score, a rationale paragraph,
                 and a list of what the student got right and what they missed.
@@ -324,16 +324,16 @@ export default function Landing() {
       {/* ── For who ──────────────────────────────────────── */}
       <section className="lp-section lp-section-alt">
         <div className="lp-section-inner">
-          <h2 className="lp-h2">Built for professors and students</h2>
+          <h2 className="lp-h2">Built for teachers and students</h2>
           <p className="lp-section-sub">Each role gets exactly what they need.</p>
           <div className="lp-two-col">
             <div className="lp-col-card">
               <div className="lp-col-icon lp-icon-prof">P</div>
-              <h3 className="lp-col-title">Professors</h3>
+              <h3 className="lp-col-title">Teachers</h3>
               <ul className="lp-col-list">
                 <li>Create exams and upload solution PDFs</li>
                 <li>See every student's score broken down by question</li>
-                <li>Read GPT-4o's rationale for each grade</li>
+                <li>Read AI's rationale for each grade</li>
                 <li>Export results to CSV</li>
                 <li>Get flagged if two submissions look suspiciously similar</li>
                 <li>Extend deadlines per student</li>
@@ -375,7 +375,7 @@ export default function Landing() {
               <ul className="lp-diff-list">
                 <li>Upload solution once, grade runs automatically</li>
                 <li>Scores and rationale generated per question</li>
-                <li>Feedback written by GPT-4o for every student</li>
+                <li>Feedback written by AI for every student</li>
                 <li>One-click CSV export</li>
                 <li>Similarity flags surface automatically</li>
               </ul>
@@ -422,7 +422,7 @@ export default function Landing() {
                   <span className="lp-plan-price">$19</span>
                   <span className="lp-plan-period">/ month</span>
                 </div>
-                <p className="lp-plan-desc">For professors who grade regularly and want the full experience.</p>
+                <p className="lp-plan-desc">For teachers who grade regularly and want the full experience.</p>
               </div>
               <div className="lp-plan-divider" />
               <ul className="lp-plan-features">
@@ -448,7 +448,7 @@ export default function Landing() {
               <div className="lp-plan-divider" />
               <ul className="lp-plan-features">
                 <li><span className="lp-feat-check">✓</span> Unlimited submissions</li>
-                <li><span className="lp-feat-check">✓</span> Multiple professor accounts</li>
+                <li><span className="lp-feat-check">✓</span> Multiple teacher accounts</li>
                 <li><span className="lp-feat-check">✓</span> Everything in Pro</li>
                 <li><span className="lp-feat-check">✓</span> LMS integration support</li>
                 <li><span className="lp-feat-check">✓</span> SSO &amp; admin dashboard</li>

@@ -1,6 +1,12 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Integer, Text, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import String, Integer, Text, ForeignKey, DateTime, Float, JSON, UniqueConstraint
 from datetime import datetime
+from typing import Optional
+import secrets, string
+
+def _gen_code() -> str:
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(chars) for _ in range(8))
 
 class Base(DeclarativeBase):
     pass
@@ -18,6 +24,7 @@ class Exam(Base):
     title: Mapped[str] = mapped_column(String(255))
     due_at: Mapped[datetime] = mapped_column(DateTime)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    enrollment_code: Mapped[Optional[str]] = mapped_column(String(8), unique=True, index=True, default=_gen_code)
 
 class Question(Base):
     __tablename__ = "questions"
@@ -60,6 +67,14 @@ class SimilarityFlag(Base):
     sem: Mapped[float] = mapped_column(Float)
     jacc: Mapped[float] = mapped_column(Float)
     reason: Mapped[str] = mapped_column(Text)
+
+class ExamEnrollment(Base):
+    """Links a student to an exam they joined via enrollment code."""
+    __tablename__ = "exam_enrollments"
+    __table_args__ = (UniqueConstraint("exam_id", "student_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    exam_id: Mapped[int] = mapped_column(ForeignKey("exams.id"))
+    student_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
 
 class SolutionDoc(Base):
     __tablename__ = "solution_docs"

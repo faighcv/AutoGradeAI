@@ -31,5 +31,13 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user = db.query(User).filter(User.id == str(sb_user.id)).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Profile not found")
+        # Auto-create profile on first login using role stored in Supabase metadata
+        meta = sb_user.user_metadata or {}
+        role = meta.get("role", "STUDENT")
+        if role not in {"PROF", "STUDENT"}:
+            role = "STUDENT"
+        user = User(id=str(sb_user.id), email=sb_user.email, role=role)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     return user

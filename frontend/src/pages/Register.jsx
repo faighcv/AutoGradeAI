@@ -17,12 +17,12 @@ export default function Register() {
     setErr(""); setOk("");
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { role } },
+      });
       if (error) throw new Error(error.message);
-
-      // Use service-key-verified endpoint — works even when email confirmation
-      // is pending (no user JWT needed, backend verifies via Supabase admin API)
-      await http.post("/auth/profile/init", { user_id: data.user.id, role });
 
       setOk("Account created! Check your email to confirm, then sign in.");
       await supabase.auth.signOut();

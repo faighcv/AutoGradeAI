@@ -13,10 +13,14 @@ elif _db_url.startswith("postgresql://"):
 
 connect_args = {}
 if _db_url.startswith("postgresql+pg8000://"):
-    # ssl_context=True tells pg8000 to use Python's default SSL context
-    # with proper certificate verification — required for Supabase Supavisor
-    # to correctly resolve the tenant from the connection startup packet.
-    connect_args["ssl_context"] = True
+    # Only use SSL for external hosts (e.g. Supabase). Railway internal
+    # connections (.railway.internal) don't need or support SSL.
+    if ".railway.internal" not in _db_url:
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        connect_args["ssl_context"] = ssl_context
 elif _db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 

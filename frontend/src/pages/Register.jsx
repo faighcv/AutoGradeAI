@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
-import { createProfile } from "../api";
+import { http } from "../api";
 
 export default function Register() {
   const nav = useNavigate();
@@ -20,12 +20,13 @@ export default function Register() {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw new Error(error.message);
 
-      // Create profile in our DB with the role
-      await createProfile(role);
+      // Use service-key-verified endpoint — works even when email confirmation
+      // is pending (no user JWT needed, backend verifies via Supabase admin API)
+      await http.post("/auth/profile/init", { user_id: data.user.id, role });
 
-      setOk("Account created! Redirecting to login…");
+      setOk("Account created! Check your email to confirm, then sign in.");
       await supabase.auth.signOut();
-      setTimeout(() => nav("/login"), 1200);
+      setTimeout(() => nav("/login"), 1500);
     } catch (e) {
       setErr(e?.message || "Registration failed");
     } finally {

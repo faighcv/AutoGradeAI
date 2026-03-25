@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import * as api from "./api";
+import { supabase } from "./supabase";
+import { http } from "./api";
 
 const AuthCtx = createContext(null);
 
@@ -7,21 +8,32 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
 
+  async function loadProfile(session) {
+    if (!session) { setUser(null); return; }
+    try {
+      const { data } = await http.get("/auth/me", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setUser(data);
+    } catch {
+      setUser(null);
+    }
+  }
+
   useEffect(() => {
-    api.http
-      .get("/auth/me")
-      .then(({ data }) => setUser(data))
-      .catch(() => setUser(null))
-      .finally(() => setChecking(false));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      loadProfile(session).finally(() => setChecking(false));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadProfile(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email, password) => {
-    const u = await api.login(email, password);
-    setUser(u);
-  };
-
   const logout = async () => {
-    try { await api.logout(); } catch {}
+    await supabase.auth.signOut();
     setUser(null);
   };
 
@@ -35,7 +47,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthCtx.Provider value={{ user, login, logout, setUser }}>
+    <AuthCtx.Provider value={{ user, setUser, logout }}>
       {children}
     </AuthCtx.Provider>
   );

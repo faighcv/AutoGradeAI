@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import * as api from "../api";
+import { supabase } from "../supabase";
+import { createProfile } from "../api";
 
 export default function Register() {
   const nav = useNavigate();
@@ -16,11 +17,17 @@ export default function Register() {
     setErr(""); setOk("");
     setLoading(true);
     try {
-      await api.register(email, password, role);
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw new Error(error.message);
+
+      // Create profile in our DB with the role
+      await createProfile(role);
+
       setOk("Account created! Redirecting to login…");
+      await supabase.auth.signOut();
       setTimeout(() => nav("/login"), 1200);
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Registration failed");
+      setErr(e?.message || "Registration failed");
     } finally {
       setLoading(false);
     }

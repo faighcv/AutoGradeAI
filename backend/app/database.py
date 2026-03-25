@@ -1,3 +1,4 @@
+import ssl
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -10,7 +11,11 @@ if _db_url.startswith("postgresql://") or _db_url.startswith("postgresql+psycopg
     _db_url = "postgresql+pg8000://" + _db_url
 
 connect_args = {}
-if _db_url.startswith("sqlite"):
+if _db_url.startswith("postgresql+pg8000://"):
+    # Supabase requires SSL
+    ssl_context = ssl.create_default_context()
+    connect_args["ssl_context"] = ssl_context
+elif _db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
 engine = create_engine(

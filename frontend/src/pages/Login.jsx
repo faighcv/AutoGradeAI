@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth";
+import { supabase } from "../supabase";
+import { http } from "../api";
 
 export default function Login() {
   const nav = useNavigate();
-  const { login } = useAuth();
+  const { setUser } = useAuth();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole]         = useState("STUDENT");
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
 
@@ -16,10 +17,16 @@ export default function Login() {
     setErr("");
     setLoading(true);
     try {
-      await login(email, password, role);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message);
+
+      const { data: profile } = await http.get("/auth/me", {
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      });
+      setUser(profile);
       nav("/app");
     } catch (error) {
-      setErr(error?.response?.data?.detail || "Invalid email or password");
+      setErr(error?.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -58,18 +65,6 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-          </div>
-
-          <div className="form-field">
-            <label className="form-label">I am a…</label>
-            <select
-              className="form-input"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="STUDENT">Student</option>
-              <option value="PROF">Professor</option>
-            </select>
           </div>
 
           {err && <div className="alert alert-error mb-16">{err}</div>}

@@ -1,76 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-import uuid
-
-from .. import schemas, models
-from ..auth.hashing import hash_password, verify_password
+from .. import models
 from ..deps import get_db, get_current_user
-from ..config import settings
+from ..deps import _supabase
 
 router = APIRouter()
 
 
-@router.post("/register")
-def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    if user.role not in {"PROF", "STUDENT"}:
-        raise HTTPException(status_code=400, detail="role must be PROF or STUDENT")
-    if db.query(models.User).filter(models.User.email == user.email).first():
-        raise HTTPException(status_code=400, detail="email already registered")
-    u = models.User(
-        email=user.email, hashed_password=hash_password(user.password), role=user.role
-    )
-    db.add(u)
+@router.post("/profile")
+def create_profile(payload: dict, db: Session = Depends(get_db),
+                   user=Depends(get_current_user)):
+    """Called by frontend after Supabase signUp to store role in our DB."""
+    role = payload.get("role", "STUDENT")
+    if role not in {"PROF", "STUDENT"}:
+        raise HTTPException(400, "role must be PROF or STUDENT")
+    # upsert — in case of retry
+    existing = db.query(models.User).filter(models.User.id == user.id).first()
+    if existing:
+        existing.role = role
+    else:
+        db.add(models.User(id=user.id, email=user.email, role=role))
     db.commit()
-    db.refresh(u)
-    return {"id": u.id, "email": u.email, "role": u.role}
-
-
-@router.post("/login")
-def login(data: dict, response: Response, db: Session = Depends(get_db)):
-    email = data.get("email")
-    password = data.get("password")
-    role = data.get("role")
-
-    if not email or not password:
-        raise HTTPException(status_code=400, detail="Missing credentials")
-
-    u = db.query(models.User).filter(models.User.email == email).first()
-    if not u or not verify_password(password, u.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-
-    if role and role != u.role:
-        raise HTTPException(status_code=401, detail=f"Role mismatch. This account is a {u.role}")
-
-    sid = uuid.uuid4().hex
-    expires = datetime.utcnow() + timedelta(hours=settings.SESSION_EXPIRE_HOURS)
-    db.add(models.Session(id=sid, user_id=u.id, expires_at=expires))
-    db.commit()
-
-    response.set_cookie(
-        key="ag_session",
-        value=sid,
-        httponly=True,
-        samesite="none" if settings.PRODUCTION else "lax",
-        secure=settings.PRODUCTION,
-        max_age=settings.SESSION_EXPIRE_HOURS * 3600,
-        path="/",
-    )
-    return {"id": u.id, "email": u.email, "role": u.role}
-
-
-@router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(
-        "ag_session",
-        path="/",
-        samesite="none" if settings.PRODUCTION else "lax",
-        secure=settings.PRODUCTION,
-    )
-    return {"ok": True}
+    return {"id": user.id, "email": user.email, "role": role}
 
 
 @router.get("/me")
 def me(user=Depends(get_current_user)):
-    """Verify the session cookie and return current user. 401 if invalid."""
     return {"id": user.id, "email": user.email, "role": user.role}

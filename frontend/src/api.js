@@ -1,10 +1,17 @@
 import axios from "axios";
+import { supabase } from "./supabase";
 
 export const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
-export const http = axios.create({
-  baseURL: API_BASE,
-  withCredentials: true,
+export const http = axios.create({ baseURL: API_BASE });
+
+// Attach Supabase JWT on every request
+http.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  return config;
 });
 
 http.interceptors.response.use(
@@ -18,18 +25,9 @@ http.interceptors.response.use(
 );
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export async function register(email, password, role) {
-  const { data } = await http.post("/auth/register", { email, password, role });
+export async function createProfile(role) {
+  const { data } = await http.post("/auth/profile", { role });
   return data;
-}
-
-export async function login(email, password) {
-  const { data } = await http.post("/auth/login", { email, password });
-  return data;
-}
-
-export async function logout() {
-  await http.post("/auth/logout");
 }
 
 // ── Professor ─────────────────────────────────────────────────────────────────

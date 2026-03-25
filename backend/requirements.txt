@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-passlib
-argon2-cffi
 sqlalchemy>=2.0
 pg8000
 pydantic[email]>=2
@@ -12,3 +10,4 @@ openai>=1.55.0
 pillow
 pytesseract
 pdf2image
+supabase

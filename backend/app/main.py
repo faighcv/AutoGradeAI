@@ -34,7 +34,7 @@ def _heartbeat():
         print(f"HEARTBEAT {i*10}s — pid={os.getpid()} alive", flush=True)
 
 threading.Thread(target=_heartbeat, daemon=True).start()
-print("STARTUP: main.py loaded, heartbeat started", flush=True)
+print(f"STARTUP: main.py loaded, heartbeat started, PORT={os.environ.get('PORT', 'NOT_SET')}", flush=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

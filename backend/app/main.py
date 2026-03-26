@@ -53,8 +53,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AutoGradeAI (Cookie Sessions)", lifespan=lifespan)
 
 _origins = [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
     "https://auto-grade-ai.vercel.app",
 ]
 _frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
@@ -64,6 +62,7 @@ if _frontend_url and _frontend_url not in _origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
+    allow_origin_regex=r"http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
